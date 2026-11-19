@@ -1,0 +1,97 @@
+<UserControl x:Class="DemonsSoulsPC.App.Views.HomeView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:svc="clr-namespace:DemonsSoulsPC.App.Services">
+
+    <Border CornerRadius="18" ClipToBounds="True" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+        <Border.Background>
+            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                <GradientStop Color="#FF1C1915" Offset="0"/>
+                <GradientStop Color="#FF12100E" Offset="0.55"/>
+                <GradientStop Color="#FF0B0A09" Offset="1"/>
+            </LinearGradientBrush>
+        </Border.Background>
+        <Grid>
+            <!-- Décor : brume, halo de braise, arche gothique et escarbilles (dessin original, aucune image du jeu) -->
+            <Canvas IsHitTestVisible="False" ClipToBounds="True">
+                <!-- Halo chaud derrière l'arche -->
+                <Ellipse Canvas.Left="470" Canvas.Top="-60" Width="560" Height="560">
+                    <Ellipse.Fill>
+                        <RadialGradientBrush>
+                            <GradientStop Color="#55E8743A" Offset="0"/>
+                            <GradientStop Color="#22C9A35A" Offset="0.45"/>
+                            <GradientStop Color="#00C9A35A" Offset="1"/>
+                        </RadialGradientBrush>
+                    </Ellipse.Fill>
+                </Ellipse>
+                <!-- Arche gothique (ogive) -->
+                <Path Canvas.Left="610" Canvas.Top="70" Stroke="#AAC9A35A" StrokeThickness="3"
+                      Data="M0,330 L0,150 Q0,40 140,0 Q280,40 280,150 L280,330"/>
+                <Path Canvas.Left="640" Canvas.Top="110" Stroke="#55C9A35A" StrokeThickness="2"
+                      Data="M0,290 L0,130 Q0,40 110,8 Q220,40 220,130 L220,290"/>
+                <!-- Lumière au fond de l'arche -->
+                <Path Canvas.Left="640" Canvas.Top="110"
+                      Data="M0,290 L0,130 Q0,40 110,8 Q220,40 220,130 L220,290 Z">
+                    <Path.Fill>
+                        <LinearGradientBrush StartPoint="0.5,0" EndPoint="0.5,1">
+                            <GradientStop Color="#40E0C27E" Offset="0"/>
+                            <GradientStop Color="#18E8743A" Offset="0.7"/>
+                            <GradientStop Color="#00E8743A" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Path.Fill>
+                </Path>
+                <!-- Silhouette debout dans l'arche -->
+                <Path Canvas.Left="738" Canvas.Top="300" Fill="#E60D0C0B"
+                      Data="M12,0 C19,0 22,6 21,12 C26,14 30,20 31,30 L34,70 L28,72 L26,100 L19,100 L17,74 L15,74 L13,100 L6,100 L4,72 L-2,70 L1,30 C2,20 6,14 3,12 C2,6 5,0 12,0 Z"/>
+                <!-- Sol embrumé -->
+                <Rectangle Canvas.Left="0" Canvas.Top="380" Width="1000" Height="140">
+                    <Rectangle.Fill>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                            <GradientStop Color="#00BFB5A6" Offset="0"/>
+                            <GradientStop Color="#14BFB5A6" Offset="0.4"/>
+                            <GradientStop Color="#00BFB5A6" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Rectangle.Fill>
+                </Rectangle>
+                <!-- Escarbilles -->
+                <Ellipse Canvas.Left="560" Canvas.Top="120" Width="4" Height="4" Fill="#CCE8743A"/>
+                <Ellipse Canvas.Left="930" Canvas.Top="90" Width="3" Height="3" Fill="#AAF5B27A"/>
+                <Ellipse Canvas.Left="905" Canvas.Top="230" Width="3" Height="3" Fill="#99E8743A"/>
+                <Ellipse Canvas.Left="590" Canvas.Top="300" Width="2" Height="2" Fill="#88F5B27A"/>
+                <Ellipse Canvas.Left="520" Canvas.Top="220" Width="3" Height="3" Fill="#77E8743A"/>
+                <Ellipse Canvas.Left="960" Canvas.Top="320" Width="2" Height="2" Fill="#99F5B27A"/>
+                <Ellipse Canvas.Left="700" Canvas.Top="40" Width="2" Height="2" Fill="#88E0C27E"/>
+                <Ellipse Canvas.Left="860" Canvas.Top="30" Width="3" Height="3" Fill="#66E8743A"/>
+                <Ellipse Canvas.Left="400" Canvas.Top="70" Width="2" Height="2" Fill="#55F5B27A"/>
+                <Ellipse Canvas.Left="480" Canvas.Top="360" Width="2" Height="2" Fill="#66E8743A"/>
+            </Canvas>
+
+            <!-- Texte -->
+            <StackPanel VerticalAlignment="Bottom" Margin="44,0,44,44">
+                <Border HorizontalAlignment="Left" CornerRadius="12" Padding="10,4" Background="#1AFFFFFF" Margin="0,0,0,14">
+                    <StackPanel Orientation="Horizontal">
+                        <Ellipse Width="8" Height="8" VerticalAlignment="Center" Margin="0,0,8,0"
+                                 Fill="{Binding GameStatus, Converter={StaticResource StatusToBrushConverter}}"/>
+                        <TextBlock Text="{Binding GameStatus}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                    </StackPanel>
+                </Border>
+                <TextBlock Text="DEMON’S SOULS" FontFamily="Georgia, Times New Roman" FontSize="58" FontWeight="Bold"
+                           Foreground="#FFF3EEE6"/>
+                <TextBlock Text="{svc:Tr 'App.Tagline'}" FontSize="17" Foreground="{StaticResource TextSecondaryBrush}" Margin="2,2,0,0"/>
+
+                <StackPanel Orientation="Horizontal" Margin="0,26,0,0">
+                    <Border CornerRadius="10" Padding="14,9" Background="#33000000" BorderBrush="#26FFFFFF" BorderThickness="1">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE7F4;" FontFamily="{StaticResource IconFont}" FontSize="14" Foreground="{StaticResource PrimaryLightBrush}"
+                                       VerticalAlignment="Center" Margin="0,0,10,0"/>
+                            <TextBlock Text="{Binding CurrentGraphicsConfig}" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis" MaxWidth="560"/>
+                        </StackPanel>
+                    </Border>
+                    <Button Content="{svc:Tr 'UI.Edit'}" Command="{Binding NavigateToSettingsCommand}" Style="{StaticResource GhostButtonStyle}"
+                            Background="#33000000" BorderBrush="#26FFFFFF" Height="38" Margin="10,0,0,0"/>
+                </StackPanel>
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>

@@ -1,0 +1,143 @@
+<UserControl x:Class="DemonsSoulsPC.App.Views.AdvancedSettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:svc="clr-namespace:DemonsSoulsPC.App.Services">
+
+    <UserControl.Resources>
+        <Style x:Key="Info" TargetType="TextBlock">
+            <Setter Property="Text" Value="&#xE946;"/>
+            <Setter Property="FontFamily" Value="{StaticResource IconFont}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="8,1,0,0"/>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="16"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <TextBlock Grid.ColumnSpan="3" Text="{svc:Tr 'UI.Advanced'}" Style="{StaticResource PageTitleStyle}"/>
+
+        <!-- Jeu -->
+        <StackPanel Grid.Row="1" Grid.Column="0">
+            <TextBlock Text="{svc:Tr 'UI.GroupGame'}" Style="{StaticResource GroupTitleStyle}"/>
+
+            <Border Style="{StaticResource SettingRowStyle}" ToolTip="{svc:Tr 'UI.LightingTip'}" Visibility="Collapsed">
+                <Grid>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{svc:Tr 'Lighting'}" Style="{StaticResource SettingLabelStyle}"/>
+                        <TextBlock Style="{StaticResource Info}"/>
+                    </StackPanel>
+                    <ComboBox ItemsSource="{Binding LightingLabels}" SelectedIndex="{Binding LightingIndex}"
+                              Style="{StaticResource ModernComboBoxStyle}" Width="264" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource SettingRowStyle}" ToolTip="{Binding SpeedNote}" Visibility="Collapsed">
+                <Grid>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{svc:Tr 'Game Speed'}" Style="{StaticResource SettingLabelStyle}"/>
+                        <TextBlock Style="{StaticResource Info}"/>
+                    </StackPanel>
+                    <ComboBox ItemsSource="{Binding SpeedLabels}" SelectedIndex="{Binding SpeedIndex}"
+                              Style="{StaticResource ModernComboBoxStyle}" Width="264" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource SettingRowStyle}" ToolTip="{Binding LanguageNote}">
+                <Grid>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{svc:Tr 'Game language'}" Style="{StaticResource SettingLabelStyle}"/>
+                        <TextBlock Style="{StaticResource Info}"/>
+                    </StackPanel>
+                    <ComboBox ItemsSource="{Binding LanguageLabels}" SelectedIndex="{Binding LanguageIndex}"
+                              Style="{StaticResource ModernComboBoxStyle}" Width="264" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource SettingRowStyle}" ToolTip="{svc:Tr 'UI.OverlayTip'}">
+                <Grid>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{svc:Tr 'UI.Overlay'}" Style="{StaticResource SettingLabelStyle}"/>
+                        <TextBlock Style="{StaticResource Info}"/>
+                    </StackPanel>
+                    <ComboBox ItemsSource="{Binding OverlayLabels}" SelectedIndex="{Binding OverlayIndex}"
+                              Style="{StaticResource ModernComboBoxStyle}" Width="264" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource SettingRowStyle}" Visibility="Collapsed">
+                <Grid>
+                    <TextBlock Text="{svc:Tr 'UI.SkipIntro'}" Style="{StaticResource SettingLabelStyle}"/>
+                    <CheckBox IsChecked="{Binding SkipIntro}" Style="{StaticResource ToggleSwitchStyle}"/>
+                </Grid>
+            </Border>
+        </StackPanel>
+
+        <!-- Performances -->
+        <StackPanel Grid.Row="1" Grid.Column="2">
+            <TextBlock Text="{svc:Tr 'UI.GroupPerf'}" Style="{StaticResource GroupTitleStyle}"/>
+
+            <Border Style="{StaticResource SettingRowStyle}" ToolTip="{svc:Tr 'UI.PriorityTip'}">
+                <Grid>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{svc:Tr 'UI.Priority'}" Style="{StaticResource SettingLabelStyle}"/>
+                        <TextBlock Style="{StaticResource Info}"/>
+                    </StackPanel>
+                    <ComboBox ItemsSource="{Binding PriorityOptions}" SelectedItem="{Binding Priority}"
+                              Style="{StaticResource ModernComboBoxStyle}" Width="160" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource SettingRowStyle}" ToolTip="{svc:Tr 'UI.PriorityTip'}">
+                <Grid>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{svc:Tr 'UI.CpPriority'}" Style="{StaticResource SettingLabelStyle}"/>
+                        <TextBlock Style="{StaticResource Info}"/>
+                    </StackPanel>
+                    <ComboBox ItemsSource="{Binding CpPriorityOptions}" SelectedItem="{Binding CpPriority}"
+                              Style="{StaticResource ModernComboBoxStyle}" Width="160" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource SettingRowStyle}" ToolTip="{svc:Tr 'UI.ShaderCacheTip'}">
+                <Grid>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{svc:Tr 'UI.ShaderCache'}" Style="{StaticResource SettingLabelStyle}"/>
+                        <TextBlock Style="{StaticResource Info}"/>
+                    </StackPanel>
+                    <CheckBox IsChecked="{Binding ShaderCache}" Style="{StaticResource ToggleSwitchStyle}"/>
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource SettingRowStyle}" ToolTip="{svc:Tr 'UI.DrawPrepTip'}">
+                <Grid>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{svc:Tr 'UI.DrawPrep'}" Style="{StaticResource SettingLabelStyle}"/>
+                        <TextBlock Style="{StaticResource Info}"/>
+                    </StackPanel>
+                    <CheckBox IsChecked="{Binding DrawPrepTuning}" Style="{StaticResource ToggleSwitchStyle}"/>
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource SettingRowStyle}" ToolTip="{svc:Tr 'UI.WatchdogTip'}">
+                <Grid>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{svc:Tr 'UI.Watchdog'}" Style="{StaticResource SettingLabelStyle}"/>
+                        <TextBlock Style="{StaticResource Info}"/>
+                    </StackPanel>
+                    <CheckBox IsChecked="{Binding HangWatchdog}" Style="{StaticResource ToggleSwitchStyle}"/>
+                </Grid>
+            </Border>
+        </StackPanel>
+    </Grid>
+</UserControl>

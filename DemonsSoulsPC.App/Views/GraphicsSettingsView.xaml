@@ -1,0 +1,156 @@
+<UserControl x:Class="DemonsSoulsPC.App.Views.GraphicsSettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:svc="clr-namespace:DemonsSoulsPC.App.Services"
+             xmlns:local="clr-namespace:DemonsSoulsPC.App.Views">
+
+    <UserControl.Resources>
+        <local:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+        <Style x:Key="Info" TargetType="TextBlock">
+            <Setter Property="Text" Value="&#xE946;"/>
+            <Setter Property="FontFamily" Value="{StaticResource IconFont}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="8,1,0,0"/>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="16"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <TextBlock Grid.ColumnSpan="2" Text="{svc:Tr 'UI.Graphics'}" Style="{StaticResource PageTitleStyle}"/>
+        <Button Grid.Column="2" Content="{svc:Tr 'UI.BestSettings'}" Command="{Binding DataContext.ApplyBestSettingsCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                Style="{StaticResource GhostButtonStyle}" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,2,0,0"/>
+
+        <!-- Affichage -->
+        <StackPanel Grid.Row="1" Grid.Column="0">
+            <TextBlock Text="{svc:Tr 'UI.GroupDisplay'}" Style="{StaticResource GroupTitleStyle}"/>
+
+            <Border Style="{StaticResource SettingRowStyle}">
+                <Grid>
+                    <TextBlock Text="{svc:Tr 'Resolution'}" Style="{StaticResource SettingLabelStyle}"/>
+                    <ComboBox ItemsSource="{Binding ResolutionLabels}" SelectedIndex="{Binding ResolutionIndex}"
+                              Style="{StaticResource ModernComboBoxStyle}" Width="264" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource SettingRowStyle}">
+                <Grid>
+                    <TextBlock Text="{svc:Tr 'UI.Fullscreen'}" Style="{StaticResource SettingLabelStyle}"/>
+                    <CheckBox IsChecked="{Binding Fullscreen}" Style="{StaticResource ToggleSwitchStyle}"/>
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource SettingRowStyle}" ToolTip="{svc:Tr 'UI.UltrawideTip'}" Visibility="Collapsed">
+                <Grid>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{svc:Tr 'UI.Ultrawide'}" Style="{StaticResource SettingLabelStyle}"/>
+                        <TextBlock Style="{StaticResource Info}"/>
+                    </StackPanel>
+                    <CheckBox IsChecked="{Binding Ultrawide}" Style="{StaticResource ToggleSwitchStyle}"/>
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource SettingRowStyle}" ToolTip="{Binding GpuNote}">
+                <Grid>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{svc:Tr 'Graphics card'}" Style="{StaticResource SettingLabelStyle}"/>
+                        <TextBlock Style="{StaticResource Info}"/>
+                    </StackPanel>
+                    <ComboBox ItemsSource="{Binding GpuLabels}" SelectedIndex="{Binding GpuIndex}" IsEnabled="{Binding HasGpuChoice}"
+                              Style="{StaticResource ModernComboBoxStyle}" Width="264" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource SettingRowStyle}" ToolTip="{Binding VSyncNote}">
+                <Grid>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="VSync" Style="{StaticResource SettingLabelStyle}"/>
+                        <TextBlock Style="{StaticResource Info}"/>
+                    </StackPanel>
+                    <CheckBox IsChecked="{Binding VSync}" IsEnabled="{Binding IsVSyncAvailable}" Style="{StaticResource ToggleSwitchStyle}"/>
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource SettingRowStyle}" ToolTip="{Binding FpsLimitNote}">
+                <Grid>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{svc:Tr 'UI.FpsLimit'}" Style="{StaticResource SettingLabelStyle}"/>
+                        <TextBlock Style="{StaticResource Info}"/>
+                    </StackPanel>
+                    <ComboBox ItemsSource="{Binding FpsLabels}" SelectedIndex="{Binding FpsIndex}" IsEnabled="{Binding IsFpsLimitEnabled}"
+                              Style="{StaticResource ModernComboBoxStyle}" Width="264" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
+        </StackPanel>
+
+        <!-- NVIDIA RTX -->
+        <StackPanel Grid.Row="1" Grid.Column="2">
+            <TextBlock Text="{svc:Tr 'UI.GroupRender'}" Style="{StaticResource GroupTitleStyle}"/>
+
+            <Border Style="{StaticResource SettingRowStyle}" ToolTip="{Binding RayTracingNote}">
+                <Grid>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{svc:Tr 'UI.RenderQualityLabel'}" Style="{StaticResource SettingLabelStyle}"/>
+                        <TextBlock Style="{StaticResource Info}"/>
+                    </StackPanel>
+                    <ComboBox ItemsSource="{Binding RayTracingLabels}" SelectedIndex="{Binding RayTracingIndex}"
+                              Style="{StaticResource ModernComboBoxStyle}" Width="264" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource SettingRowStyle}" Visibility="Collapsed">
+                <Grid>
+                    <TextBlock Text="DLSS" Style="{StaticResource SettingLabelStyle}"/>
+                    <ComboBox ItemsSource="{Binding UpscaleLabels}" SelectedIndex="{Binding UpscaleIndex}"
+                              Style="{StaticResource ModernComboBoxStyle}" Width="264" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource SettingRowStyle}" ToolTip="{Binding FrameGenNote}" Visibility="Collapsed">
+                <Grid>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Frame Generation" Style="{StaticResource SettingLabelStyle}"/>
+                        <TextBlock Style="{StaticResource Info}"/>
+                    </StackPanel>
+                    <ComboBox ItemsSource="{Binding FrameGenLabels}" SelectedIndex="{Binding FrameGenIndex}" IsEnabled="{Binding IsFrameGenAvailable}"
+                              Style="{StaticResource ModernComboBoxStyle}" Width="264" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource SettingRowStyle}" Visibility="Collapsed">
+                <Grid>
+                    <TextBlock Text="{svc:Tr 'UI.FgTarget'}" Style="{StaticResource SettingLabelStyle}"/>
+                    <ComboBox ItemsSource="{Binding FrameGenTargetLabels}" SelectedIndex="{Binding FrameGenTargetIndex}"
+                              Style="{StaticResource ModernComboBoxStyle}" Width="264" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource SettingRowStyle}" Visibility="Collapsed">
+                <Grid>
+                    <TextBlock Text="{svc:Tr 'UI.Reflex'}" Style="{StaticResource SettingLabelStyle}"/>
+                    <CheckBox IsChecked="{Binding LowLatency}" IsEnabled="{Binding SupportsReflex}" Style="{StaticResource ToggleSwitchStyle}"/>
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource SettingRowStyle}" ToolTip="{svc:Tr 'UI.FpsCounterTip'}">
+                <Grid>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{svc:Tr 'UI.FpsCounter'}" Style="{StaticResource SettingLabelStyle}"/>
+                        <TextBlock Style="{StaticResource Info}"/>
+                    </StackPanel>
+                    <CheckBox IsChecked="{Binding FpsCounter}" Style="{StaticResource ToggleSwitchStyle}"/>
+                </Grid>
+            </Border>
+        </StackPanel>
+    </Grid>
+</UserControl>
