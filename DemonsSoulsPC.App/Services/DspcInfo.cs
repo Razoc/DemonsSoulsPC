@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Reflection;
 using System.Text.Json;
@@ -15,14 +15,14 @@ namespace DemonsSoulsPC.App.Services
         public const string LauncherAssetName = "DemonsSoulsPC.exe";
         public const string ExeName = "DemonsSoulsPC.exe";
 
-        // The runtime (kyty_gpu.dll, PS5 system libraries, relinker, DLSS and FSR files...) is Demon’s Souls PC's own
-        // package (Tools\release\make_runtime.ps1), pinned by version and SHA-256. A new Demon’s Souls PC version can move the pin; installed
-        // copies then offer to update the runtime.
-        public const string RuntimeVersion = "0.1.0";
-        public const string RuntimeUrl = "https://github.com/" + Repo + "/releases/download/v0.1.0/DemonsSoulsPC-runtime-0.1.0.zip";
-        public const string RuntimeSha256 = "2940e142db9d71f31fd6e4377a3c5aa6977fbc25caf1c76c15191a212e0d63d9";
-        public const long RuntimeZipBytes = 200_997_532;
-        public const long NeededBytes = 3L * 1024 * 1024 * 1024; // runtime + game builds, with margin
+        // The runtime (Build\Engine: the KytyPS5 engine tuned for Demon's Souls, chenxiao07/KytyPS5, GPL-2.0) is
+        // Demon’s Souls PC's own package (Tools\release\make_runtime.ps1), pinned by version and SHA-256. A new
+        // Demon’s Souls PC version can move the pin; installed copies then offer to update the runtime.
+        public const string RuntimeVersion = "0.2.0";
+        public const string RuntimeUrl = "https://github.com/" + Repo + "/releases/download/v0.2.0/DemonsSoulsPC-runtime-0.2.0.zip";
+        public const string RuntimeSha256 = "33b448d53dbe2a6f160fada4153b8bf7d384fc71d0057e38221f01fba0f6a0ce";
+        public const long RuntimeZipBytes = 16_020_989;
+        public const long NeededBytes = 16L * 1024 * 1024 * 1024; // engine + shader caches (4.5-5.5 GB precompiled, 2 GB translated) + the precompile's ~12 GB at its end
         public const string RuntimeVersionFile = "dspc-runtime.txt";
 
         // Launcher files and scripts at the zip root: Demon’s Souls PC replaces them (it starts the game itself).
@@ -47,8 +47,8 @@ namespace DemonsSoulsPC.App.Services
         }
 
         public static bool IsInstallFolder(string? dir) =>
-            !string.IsNullOrEmpty(dir) && File.Exists(Path.Combine(dir, "Build", "RunHybrid", "kyty_gpu.dll")) &&
-            File.Exists(Path.Combine(dir, "tools", "relinker.exe"));
+            !string.IsNullOrEmpty(dir) && File.Exists(Path.Combine(dir, "Build", "Engine", "kyty_emulator.exe")) &&
+            File.Exists(Path.Combine(dir, "Build", "Engine", "run-windows.ps1"));
 
         public static string InstalledRuntimeVersion(string installDir)
         {

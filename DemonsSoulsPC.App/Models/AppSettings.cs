@@ -6,16 +6,17 @@ namespace DemonsSoulsPC.App.Models
 {
     public class AppSettings
     {
-        // Demon’s Souls PC: rendering quality, 0 = PS5 Performance mode settings, 1 = the game's own (4K Fidelity).
+        // Demon’s Souls PC 0.2: graphics, 0 = standard (as on the PS5), 1 = low, 2 = lowest (-Quality of the engine).
         [JsonPropertyName("lighting")]
         public int Lighting { get; set; } = 0;
 
-        // 0 = 30, 1 = 35, 2 = 45, 3 = 50, 4 = 55, 5 = 60, 6 = no limit (the game paces itself at 60 in Performance mode).
+        // 0.2 (fpsv 3): 0 = 30 (steady), 1 = 60 (the game's own), 2 = up to 120. Files of 0.1.x (fpsv 2: 0 = 30 ...
+        // 5 = 60, 6 = no limit) are converted by SettingsManager.
         [JsonPropertyName("fps")]
-        public int Fps { get; set; } = 5;
+        public int Fps { get; set; } = 1;
 
         [JsonPropertyName("fpsv")]
-        public int FpsVersion { get; set; } = 2;
+        public int FpsVersion { get; set; } = 3;
 
         [JsonPropertyName("size")]
         public int Size { get; set; } = 2;

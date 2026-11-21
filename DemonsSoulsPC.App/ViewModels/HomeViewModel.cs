@@ -43,7 +43,10 @@ namespace DemonsSoulsPC.App.ViewModels
 
         public string CurrentGraphicsConfig => BuildGraphicsConfigString();
 
-        public string RayTracingToggleText => _mainViewModel.Settings.Lighting == 1 ? Loc.T("UI.RenderQuality") : Loc.T("UI.RenderPerf");
+        public string RayTracingToggleText => RenderLabel(_mainViewModel.Settings.Lighting);
+
+        private static string RenderLabel(int lighting) =>
+            lighting == 2 ? Loc.T("UI.RenderLowest") : lighting == 1 ? Loc.T("UI.RenderQuality") : Loc.T("UI.RenderPerf");
 
         public bool CanLaunch => _mainViewModel.InstallationState?.IsInstalled == true;
 
@@ -52,7 +55,7 @@ namespace DemonsSoulsPC.App.ViewModels
         public ICommand NavigateToInstallationCommand { get; }
         public ICommand ToggleRayTracingCommand => new RelayCommand(() =>
         {
-            _mainViewModel.Settings.Lighting = _mainViewModel.Settings.Lighting == 1 ? 0 : 1;
+            _mainViewModel.Settings.Lighting = (_mainViewModel.Settings.Lighting + 1) % 3;
             OnPropertyChanged(nameof(CurrentGraphicsConfig));
             OnPropertyChanged(nameof(RayTracingToggleText));
             _mainViewModel.OnPropertyChanged(nameof(MainWindowViewModel.Settings));
@@ -68,7 +71,7 @@ namespace DemonsSoulsPC.App.ViewModels
 
             parts.Add(_mainViewModel.Settings.Fullscreen ? Loc.T("Fullscreen") : Loc.T("Windowed"));
 
-            parts.Add(_mainViewModel.Settings.Lighting == 1 ? Loc.T("UI.RenderQuality") : Loc.T("UI.RenderPerf"));
+            parts.Add(RenderLabel(_mainViewModel.Settings.Lighting));
 
             return string.Join("  ·  ", parts);
         }

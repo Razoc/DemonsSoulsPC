@@ -152,7 +152,7 @@ namespace DemonsSoulsPC.App.ViewModels
 
         // Demon’s Souls PC: rendering quality (Settings.Lighting): 0 = the PS5 Performance mode settings, 1 = the
         // game's own settings (4K Fidelity mode), applied to copies of misc\renderconfig_ps5_*.txt at each launch.
-        public string[] RayTracingLabels => new[] { Loc.T("UI.RenderPerf"), Loc.T("UI.RenderQuality") };
+        public string[] RayTracingLabels => new[] { Loc.T("UI.RenderPerf"), Loc.T("UI.RenderQuality"), Loc.T("UI.RenderLowest") };
 
         public int RayTracingIndex
         {
@@ -169,7 +169,7 @@ namespace DemonsSoulsPC.App.ViewModels
             }
         }
 
-        public string RayTracingNote => _mainViewModel.Settings.Lighting == 1
+        public string RayTracingNote => _mainViewModel.Settings.Lighting >= 1
             ? Loc.T("UI.RenderQualityTip")
             : Loc.T("UI.RenderPerfTip");
 
@@ -202,7 +202,7 @@ namespace DemonsSoulsPC.App.ViewModels
             : Loc.T("UI.FpsLimitFg");
 
         // FPS Limiter
-        public string[] FpsLabels => new[] { "30 FPS", "35 FPS", "45 FPS", "50 FPS", "55 FPS", Loc.T("UI.Fps60Recommended"), Loc.T("No limit") };
+        public string[] FpsLabels => new[] { "30 FPS", Loc.T("UI.Fps60Recommended"), "120 FPS" };
 
         public int FpsIndex
         {

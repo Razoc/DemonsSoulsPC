@@ -5,20 +5,30 @@
   "repo": "Razoc/DemonsSoulsPC",
   "game": {
     "kind": "folder",
-    "label": "Your decrypted PS5 dump of Demon's Souls (PPSA01341 or another region): the folder with eboot.bin, sce_module and sce_sys. It is never changed.",
+    "label": "Your decrypted PS5 dump of Demon's Souls (PPSA01341, version 1.07 or 1.05): the folder with eboot.bin, sce_module and sce_sys. It is read where it is and never changed.",
     "check": { "file": "eboot.bin" }
   },
   "prepare": {
     "program": ["DemonsSoulsPC.exe"],
     "args": ["--prepare", "{game}"],
-    "label": "Demon's Souls PC runtime (192 MB) and the game converted from your dump",
+    "label": "Demon's Souls PC engine (16 MB, KytyPS5 tuned for Demon's Souls)",
     "timeout": 1800,
-    "version": "0.1.0",
-    "done": ["{install}/Build/RunHybrid/DemonsSouls.exe", "{install}/Build/RunHybrid/kyty_gpu.dll"]
+    "version": "0.2.0",
+    "done": ["{install}/Build/Engine/kyty_emulator.exe", "{install}/Build/Engine/dspc-game.json"]
   },
   "start": {
     "program": ["DemonsSoulsPC.exe"],
     "args": ["--play"]
+  },
+  "exit_codes": {
+    "0": "ok",
+    "-1073741819": "Demon's Souls PC stopped because of a crash. Please send a report from the launcher: it includes Logs/dspc-summary.txt, which tells us your PC, settings and what went wrong.",
+    "3221225477": "Demon's Souls PC stopped because of a crash. Please send a report from the launcher: it includes Logs/dspc-summary.txt, which tells us your PC, settings and what went wrong.",
+    "-1073740791": "Demon's Souls PC stopped because of a crash. Please send a report from the launcher: it includes Logs/dspc-summary.txt, which tells us your PC, settings and what went wrong.",
+    "3221226505": "Demon's Souls PC stopped because of a crash. Please send a report from the launcher: it includes Logs/dspc-summary.txt, which tells us your PC, settings and what went wrong.",
+    "-1073741515": "A file the game needs is missing (a DLL). Reinstall Demon's Souls PC from the launcher.",
+    "3221225781": "A file the game needs is missing (a DLL). Reinstall Demon's Souls PC from the launcher.",
+    "2": "Demon's Souls PC could not start the game. Please send a report from the launcher: Logs/dspc-error.log says why."
   },
   "config": [
     {
@@ -29,43 +39,38 @@
     }
   ],
   "saves": [
-    "{install}/Build/RunHybrid/_sd",
-    "{install}/Build/RunHybrid/_sd_mem",
-    "{install}/Build/RunHybrid/_trophy",
+    "{install}/Build/Engine/_SaveData",
     "{install}/Build/dspc-settings.json"
   ],
   "folders": {
-    "saves": [{ "path": "{install}/Build/RunHybrid/_sd" }],
-    "logs": [{ "path": "{install}/Logs" }],
-    "game": [{ "path": "{install}/Build/RunHybrid" }]
+    "saves": [{ "path": "{install}/Build/Engine/_SaveData" }],
+    "logs": [{ "path": "{install}/Logs" }, { "path": "{install}/Build/Engine/logs" }],
+    "game": [{ "path": "{install}/Build/Engine" }]
   },
   "looks": {
     "allowed": false,
-    "reason": "The game runs in a second program (Build\\RunHybrid\\DemonsSouls.exe) started by Demon's Souls PC, so ReShade looks don't reach it."
+    "reason": "The game runs in a second program (Build\\Engine\\kyty_emulator.exe) started by Demon's Souls PC, so ReShade looks don't reach it."
   },
   "settings": [
     {
-      "id": "quality", "label": "Rendering quality", "group": "Picture",
-      "help": "Performance uses the PS5 Performance mode settings (no 4K rendering). Quality keeps the game's own 4K Fidelity settings and is much heavier.",
+      "id": "quality", "label": "Graphics", "group": "Picture",
+      "help": "Standard is the game as on the PS5. Low and Lowest shorten shadows and distant detail and use smaller textures: for a modest processor or graphics card.",
       "choices": [
-        { "label": "Performance", "set": { "lighting": "0" } },
-        { "label": "Quality (4K)", "set": { "lighting": "1" } }
+        { "label": "Standard", "set": { "lighting": "0" } },
+        { "label": "Low", "set": { "lighting": "1" } },
+        { "label": "Lowest", "set": { "lighting": "2" } }
       ],
       "defaults": { "lighting": "0" }
     },
     {
-      "id": "fps", "label": "Frame rate limit", "group": "Picture",
-      "help": "The game aims for 60 in Performance mode.",
+      "id": "fps", "label": "Frame rate", "group": "Picture",
+      "help": "60 is the game's own. 30 is a steady half rate for slower PCs. 120 lets the game run past 60 where the PC can.",
       "choices": [
-        { "label": "30", "set": { "fps": "0" } },
-        { "label": "35", "set": { "fps": "1" } },
-        { "label": "45", "set": { "fps": "2" } },
-        { "label": "50", "set": { "fps": "3" } },
-        { "label": "55", "set": { "fps": "4" } },
-        { "label": "60", "set": { "fps": "5" } },
-        { "label": "No limit", "set": { "fps": "6" } }
+        { "label": "30", "set": { "fps": "0", "fpsv": "3" } },
+        { "label": "60", "set": { "fps": "1", "fpsv": "3" } },
+        { "label": "Up to 120", "set": { "fps": "2", "fpsv": "3" } }
       ],
-      "defaults": { "fps": "5" }
+      "defaults": { "fps": "1", "fpsv": "3" }
     },
     {
       "id": "vsync", "label": "V-Sync", "group": "Picture",
@@ -92,16 +97,19 @@
         { "label": "1280 x 720", "set": { "size": "0" } },
         { "label": "1600 x 900", "set": { "size": "1" } },
         { "label": "1920 x 1080", "set": { "size": "2" } },
-        { "label": "2560 x 1440", "set": { "size": "3" } }
+        { "label": "2560 x 1440", "set": { "size": "3" } },
+        { "label": "2560 x 1080 (21:9)", "set": { "size": "4" } },
+        { "label": "3440 x 1440 (21:9)", "set": { "size": "5" } }
       ],
       "defaults": { "size": "2" }
     },
     {
-      "id": "overlay", "label": "FPS counter", "group": "Display",
-      "help": "The frame rate in the top right corner of the game.",
+      "id": "overlay", "label": "Performance overlay", "group": "Display",
+      "help": "The frame rate (and with Detailed the graphics card, processor and memory) in the top right corner. F8 in the game switches it.",
       "choices": [
         { "label": "Off", "set": { "overlay": "0" } },
-        { "label": "On", "set": { "overlay": "1" } }
+        { "label": "Frame rate", "set": { "overlay": "1" } },
+        { "label": "Detailed", "set": { "overlay": "2" } }
       ],
       "defaults": { "overlay": "0" }
     }

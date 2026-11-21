@@ -34,6 +34,14 @@ namespace DemonsSoulsPC.App.Services
                     _cachedSettings = JsonSerializer.Deserialize<AppSettings>(json, _jsonOptions) ?? new AppSettings();
                     // Older files only have the preset index ("rumble"); make the percent explicit.
                     _cachedSettings.NormalizeRumble();
+                    // 0.1.x files: frame rate 0..6 -> 30 / 60 / 120, and their "quality (4K)" choice -> standard.
+                    if (_cachedSettings.FpsVersion < 3)
+                    {
+                        var old = _cachedSettings.Fps;
+                        _cachedSettings.Fps = old == 0 ? 0 : old == 6 ? 2 : 1;
+                        _cachedSettings.Lighting = 0;
+                        _cachedSettings.FpsVersion = 3;
+                    }
                     return _cachedSettings;
                 }
                 catch

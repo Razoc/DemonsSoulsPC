@@ -65,7 +65,7 @@
             <Button Content="{svc:Tr 'Open Install Folder'}" Command="{Binding OpenInstallFolderCommand}" Style="{StaticResource GhostButtonStyle}" Margin="0,0,10,10"/>
             <Button Content="{svc:Tr 'Open Log Folder'}" Command="{Binding OpenLogFolderCommand}" Style="{StaticResource GhostButtonStyle}" Margin="0,0,10,10"/>
             <Button Content="{svc:Tr 'Repair Installation'}" Command="{Binding RepairCommand}" Style="{StaticResource GhostButtonStyle}" Margin="0,0,10,10"/>
-            <Button Content="{svc:Tr 'Rebuild Installation'}" Command="{Binding RebuildCommand}" Style="{StaticResource GhostButtonStyle}" Margin="0,0,10,10"/>
+            <Button Content="{svc:Tr 'UI.PrecompileButton'}" Command="{Binding RebuildCommand}" Style="{StaticResource GhostButtonStyle}" Margin="0,0,10,10"/>
             <Button Content="{svc:Tr 'Change Location'}" Command="{Binding ChangeLocationCommand}" Style="{StaticResource GhostButtonStyle}" Margin="0,0,10,10"/>
         </WrapPanel>
 

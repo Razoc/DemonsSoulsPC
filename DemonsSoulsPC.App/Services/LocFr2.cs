@@ -200,6 +200,21 @@ namespace DemonsSoulsPC.App.Services
                 "Transmet l'état des gâchettes DualSense. Sans ça, le jeu ignore L2/R2.",
             ["Skips the opening PlayStation Studios and Team Asobi intro videos (-skipIntro)."] =
                 "Passe les vidéos d'intro PlayStation Studios et Team Asobi (-skipIntro).",
+            // 0.2 (moteur KytyPS5 de chenxiao07)
+            ["The runtime files are missing (Build\\Engine\\kyty_emulator.exe). Install Demon’s Souls PC again."] =
+                "Des fichiers du runtime manquent (Build\\Engine\\kyty_emulator.exe). Réinstalle Demon’s Souls PC.",
+            ["eboot.bin not found in the game folder."] = "eboot.bin introuvable dans le dossier du jeu.",
+            ["Bringing your saves over..."] = "Reprise de tes sauvegardes...",
+            ["Removing the files of the previous version..."] = "Suppression des fichiers de la version précédente...",
+            ["The game folder (with eboot.bin) was not found: choose it again in the settings."] =
+                "Le dossier du jeu (avec eboot.bin) est introuvable : choisis-le à nouveau dans les réglages.",
+            ["Setting the game up on the new engine..."] = "Mise en place du jeu sur le nouveau moteur...",
+            ["Precompiling shaders..."] = "Précompilation des shaders...",
+            ["Precompiling shaders: {0} of {1}"] = "Précompilation des shaders : {0} sur {1}",
+            ["Ready to play: the rest of the shaders follow."] = "Prêt à jouer : le reste des shaders suit.",
+            ["Precompile stopped: the next run continues."] = "Précompilation arrêtée : la prochaine reprendra là.",
+            ["Shaders precompiled."] = "Shaders précompilés.",
+            ["Precompile failed (code {0}): see Logs\\precompile.log."] = "Échec de la précompilation (code {0}) : voir Logs\\precompile.log.",
         };
     }
 }

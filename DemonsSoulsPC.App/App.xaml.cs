@@ -97,6 +97,13 @@ namespace DemonsSoulsPC.App
                 PlayWithoutWindow();
                 return;
             }
+            // DemonsSoulsPC.exe --precompile: the full shader precompile (about an hour, the CPU fully loaded) without a
+            // window; progress lines as for --prepare, output in Logs\precompile.log; stopping it keeps what is done.
+            if (e.Args.Length == 1 && e.Args[0] == "--precompile")
+            {
+                PrecompileWithoutWindow();
+                return;
+            }
             // DemonsSoulsPC.exe --remove-game: removes what the setup built (Installation page, Uninstall).
             if (e.Args.Length == 1 && e.Args[0] == "--remove-game")
             {
@@ -217,8 +224,39 @@ namespace DemonsSoulsPC.App
             if (window.ShowDialog() != true)
                 return; // keep the current runtime
             InitializeSettings();
-            _settings.FirstRunComplete = false; // rebuild DemonsSouls.exe with the new runtime
-            _settingsManager.Save(_settings);
+            // A known dump is set up on the new runtime by the main window (MainWindowViewModel); otherwise the wizard asks for it.
+            if (string.IsNullOrEmpty(_settings.GameDumpPath) || !File.Exists(Path.Combine(_settings.GameDumpPath, "eboot.bin")))
+            {
+                _settings.FirstRunComplete = false;
+                _settingsManager.Save(_settings);
+            }
+        }
+
+        private async void PrecompileWithoutWindow()
+        {
+            var root = GetRootDirectory();
+            StreamWriter? output = null;
+            try { output = new StreamWriter(Console.OpenStandardOutput(), new System.Text.UTF8Encoding(false)) { AutoFlush = true }; }
+            catch { }
+            try
+            {
+                InitializeSettings();
+                var dump = _settings.GameDumpPath ?? GameFeatures.Load(GameSetup.EngineDirectory(root))?.Dump;
+                if (string.IsNullOrEmpty(dump) || !File.Exists(Path.Combine(dump, "eboot.bin")))
+                    throw new DirectoryNotFoundException("The game folder (with eboot.bin) is not set up.");
+                var progress = new Progress<(int Percent, string Message)>(p =>
+                {
+                    if (p.Percent < 0) return;
+                    try { output?.WriteLine(FormattableString.Invariant($"progress {p.Percent / 100.0:0.00} {p.Message}")); } catch { }
+                });
+                var code = await GameSetup.PrecompileAsync(root, dump!, progress);
+                Shutdown(code);
+            }
+            catch (Exception ex)
+            {
+                try { Console.Error.WriteLine(ex.Message); } catch { }
+                Shutdown(2);
+            }
         }
 
         private async Task CheckForDspcUpdateAsync()
@@ -356,6 +394,10 @@ namespace DemonsSoulsPC.App
             {
                 var root = GetRootDirectory();
                 var settings = new SettingsManager(root).Load();
+                // The shaders first when never precompiled for this engine and driver (a window with the progress).
+                ShutdownMode = ShutdownMode.OnExplicitShutdown;
+                var dump = settings.GameDumpPath ?? GameFeatures.Load(GameSetup.EngineDirectory(root))?.Dump;
+                if (!Views.ShaderPrepWindow.PrepareBeforePlay(root, dump)) { Shutdown(0); return; }
                 Shutdown(await new LauncherService(root).LaunchGameAsync(settings));
             }
             catch (Exception ex)
@@ -394,8 +436,8 @@ namespace DemonsSoulsPC.App
 
         private static bool ExistingInstallation()
         {
-            var runHybrid = Path.Combine(GetRootDirectory(), "Build", "RunHybrid");
-            return File.Exists(Path.Combine(runHybrid, "DemonsSouls.exe")) && File.Exists(Path.Combine(runHybrid, "kyty_gpu.dll"));
+            var engine = GameSetup.EngineDirectory(GetRootDirectory());
+            return File.Exists(Path.Combine(engine, GameSetup.GameExe)) && File.Exists(Path.Combine(engine, GameFeatures.FileName));
         }
 
         private void InitializeSettings()
@@ -425,7 +467,6 @@ namespace DemonsSoulsPC.App
             var dirs = new[]
             {
                 Path.Combine(rootDir, "Build"),
-                Path.Combine(rootDir, "Build", "RunHybrid"),
                 Path.Combine(rootDir, "Logs"),
                 Path.Combine(rootDir, "Build", "launcher")
             };

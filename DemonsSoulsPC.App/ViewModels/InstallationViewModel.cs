@@ -17,7 +17,8 @@ namespace DemonsSoulsPC.App.ViewModels
             _mainViewModel = mainViewModel;
             _mainViewModel.PropertyChanged += (sender, e) => OnPropertyChanged(string.Empty);
             RepairCommand = new RelayCommand(() => _mainViewModel.RepairInstallationCommand.Execute(null));
-            RebuildCommand = new RelayCommand(() => _mainViewModel.RebuildInstallationCommand.Execute(null));
+            // 0.2: nothing to rebuild; the button precompiles the shaders instead.
+            RebuildCommand = new RelayCommand(Precompile);
             ChangeLocationCommand = new RelayCommand(() => _mainViewModel.ChangeInstallLocationCommand.Execute(null));
             OpenInstallFolderCommand = new RelayCommand(() => _mainViewModel.OpenInstallFolderCommand.Execute(null));
             OpenLogFolderCommand = new RelayCommand(() => _mainViewModel.OpenLogFolderCommand.Execute(null));
@@ -54,6 +55,46 @@ namespace DemonsSoulsPC.App.ViewModels
         public ICommand OpenLogFolderCommand { get; }
         public ICommand UninstallCommand { get; }
         public ICommand RunSetupAgainCommand { get; }
+
+        private bool _precompiling;
+        private System.Threading.CancellationTokenSource? _precompileStop;
+
+        // The full shader precompile (about an hour, the CPU fully loaded): asked first; pressing the button again
+        // stops it (what is done is kept, the next run continues).
+        private async void Precompile()
+        {
+            if (_precompiling)
+            {
+                _precompileStop?.Cancel();
+                return;
+            }
+            var dump = _mainViewModel.Settings.GameDumpPath;
+            if (string.IsNullOrEmpty(dump) || !System.IO.File.Exists(System.IO.Path.Combine(dump, "eboot.bin")))
+            {
+                MessageBox.Show(Loc.T("The game folder (with eboot.bin) was not found: choose it again in the settings."), "Demon’s Souls PC");
+                return;
+            }
+            if (MessageBox.Show(Loc.T("UI.PrecompileAsk"), "Demon’s Souls PC", MessageBoxButton.YesNo, MessageBoxImage.Information) != MessageBoxResult.Yes)
+                return;
+            _precompiling = true;
+            _precompileStop = new System.Threading.CancellationTokenSource();
+            _mainViewModel.StatusMessage = Loc.T("Precompiling shaders...");
+            try
+            {
+                var progress = new Progress<(int Percent, string Message)>(p => _mainViewModel.StatusMessage = p.Percent >= 0 ? $"{p.Message} ({p.Percent} %)" : p.Message);
+                var code = await GameSetup.PrecompileAsync(_mainViewModel.RootDirectory, dump!, progress, _precompileStop.Token);
+                _mainViewModel.StatusMessage = _precompileStop.IsCancellationRequested ? Loc.T("Precompile stopped: the next run continues.")
+                    : code == 0 ? Loc.T("Shaders precompiled.") : string.Format(Loc.T("Precompile failed (code {0}): see Logs\\precompile.log."), code);
+            }
+            catch (Exception ex)
+            {
+                _mainViewModel.StatusMessage = ex.Message;
+            }
+            finally
+            {
+                _precompiling = false;
+            }
+        }
 
         private void RunSetupAgain()
         {

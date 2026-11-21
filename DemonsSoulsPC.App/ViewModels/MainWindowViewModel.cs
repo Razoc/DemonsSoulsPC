@@ -27,6 +27,7 @@ namespace DemonsSoulsPC.App.ViewModels
         private readonly ControllerDetector _controllerDetector;
         private readonly LauncherService _launcherService;
         private readonly string _rootDirectory;
+        public string RootDirectory => _rootDirectory;
 
         public SettingsManager SettingsManager => _settingsManager;
 
@@ -213,30 +214,23 @@ namespace DemonsSoulsPC.App.ViewModels
 
                 StatusMessage = InstallationState?.IsInstalled == true ? Loc.T("Ready") : Loc.T("Setup required");
 
-                // A game converted by an earlier version on a CPU that is not an AMD one still holds AMD-only
-                // instructions and hangs after the title screen: convert it again, once.
-                var runHybrid = System.IO.Path.Combine(_rootDirectory, "Build", "RunHybrid");
-                var features = GameFeatures.Load(runHybrid);
+                // Updated from 0.1.x: the 0.2 engine is there but the game is not set up on it yet (no
+                // Build\Engine\dspc-game.json). The dump is known: set it up now (a few seconds, saves brought over).
                 var setup = new GameSetup(_rootDirectory);
-                if (InstallationState?.IsInstalled == true && setup.IsReleaseLayout && features != null && !features.IntelConversion &&
-                    GameSetup.NeedsIntelConversion() && !string.IsNullOrEmpty(Settings.GameDumpPath))
+                var features = GameFeatures.Load(GameSetup.EngineDirectory(_rootDirectory));
+                if (InstallationState?.IsInstalled != true && setup.IsReleaseLayout && features == null &&
+                    !string.IsNullOrEmpty(Settings.GameDumpPath) && System.IO.File.Exists(System.IO.Path.Combine(Settings.GameDumpPath, "eboot.bin")))
                 {
-                    var answer = MessageBox.Show(
-                        "This PC's processor needs an updated conversion of the game (it fixes the hang after the title screen on Intel processors).\n\nConvert the game again now? It takes about a minute.",
-                        Loc.T("Demon’s Souls PC"), MessageBoxButton.YesNo, MessageBoxImage.Information);
-                    if (answer == MessageBoxResult.Yes)
+                    StatusMessage = Loc.T("Setting the game up on the new engine...");
+                    try
                     {
-                        StatusMessage = Loc.T("Converting the game for this processor...");
-                        try
-                        {
-                            await _installationManager.RepairAsync();
-                            InstallationState = await _installationManager.GetInstallationStateAsync();
-                            StatusMessage = Loc.T("Ready");
-                        }
-                        catch (Exception ex)
-                        {
-                            StatusMessage = $"Conversion failed: {ex.Message}";
-                        }
+                        await _installationManager.RepairAsync();
+                        InstallationState = await _installationManager.GetInstallationStateAsync();
+                        StatusMessage = Loc.T("Ready");
+                    }
+                    catch (Exception ex)
+                    {
+                        StatusMessage = $"Setup failed: {ex.Message}";
                     }
                 }
             }
@@ -269,6 +263,12 @@ namespace DemonsSoulsPC.App.ViewModels
             }
 
             IsLaunching = true;
+            // The shaders first when never precompiled for this engine and driver (a window with the progress).
+            if (!DemonsSoulsPC.App.Views.ShaderPrepWindow.PrepareBeforePlay(RootDirectory, Settings.GameDumpPath, Application.Current?.MainWindow))
+            {
+                IsLaunching = false;
+                return;
+            }
             StatusMessage = Loc.T("Launching Demon’s Souls...");
 
             try
@@ -314,7 +314,7 @@ namespace DemonsSoulsPC.App.ViewModels
             // Demon’s Souls PC: PS5 Performance mode rendering, 60 FPS limit, the largest 16:9 size that fits the
             // screen; no DLSS, FSR or frame generation (not tested on this game yet).
             Settings.Lighting = 0;
-            Settings.Fps = 5;
+            Settings.Fps = 1;
             Settings.Size = best.Size;
             Settings.Fullscreen = true;
             Settings.Upscale = 0;

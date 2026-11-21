@@ -35,7 +35,7 @@ namespace DemonsSoulsPC.App.Services
         public async Task<InstallationState> GetInstallationStateAsync()
         {
             var settings = _settingsManager.Load();
-            var installPath = Path.Combine(_rootDirectory, "Build", "RunHybrid");
+            var installPath = GameSetup.EngineDirectory(_rootDirectory);
             var param = ReadInstalledParam();
             var manifest = settings.InstallationManifest;
             var state = new InstallationState
@@ -57,7 +57,7 @@ namespace DemonsSoulsPC.App.Services
                 state.InstallSizeBytes = GetDirectorySize(state.InstallPath);
                 if (state.Manifest == null)
                 {
-                    var exePath = Path.Combine(installPath, "DemonsSouls.exe");
+                    var exePath = Path.Combine(installPath, GameSetup.GameExe);
                     var installedAt = File.Exists(exePath) ? File.GetLastWriteTime(exePath) : (DateTime?)null;
                     state.Manifest = CreateManifest(_rootDirectory, state.GameDumpPath, state.GameVersion, state.GameTitleId, installedAt);
                     state.InstalledAt = state.Manifest.InstalledAt;
@@ -78,7 +78,7 @@ namespace DemonsSoulsPC.App.Services
             string? gameTitleId,
             DateTime? installedAt = null)
         {
-            var installPath = Path.Combine(rootDirectory, "Build", "RunHybrid");
+            var installPath = GameSetup.EngineDirectory(rootDirectory);
             return new InstallationManifest
             {
                 InstalledAt = installedAt ?? DateTime.Now,
@@ -100,7 +100,10 @@ namespace DemonsSoulsPC.App.Services
             settingsManager.Save(settings);
         }
 
-        public static string ReadAnyPs5Version(string rootDirectory)
+        // 0.2: no AnyPS5 any more (the engine runs the game by itself).
+        public static string ReadAnyPs5Version(string rootDirectory) => "-";
+
+        private static string ReadAnyPs5VersionOld(string rootDirectory)
         {
             var gitHash = TryReadGitShortHead(Path.Combine(rootDirectory, "Tools", "AnyPS5"));
             if (!string.IsNullOrEmpty(gitHash))
@@ -117,7 +120,14 @@ namespace DemonsSoulsPC.App.Services
             return "unknown";
         }
 
+        // The engine release (Build\Engine\engine-version.txt, "v20261121 65433d2e").
         public static string ReadKytyVersion(string rootDirectory)
+        {
+            var engine = GameSetup.EngineVersion(rootDirectory);
+            return string.IsNullOrEmpty(engine) ? "unknown" : "KytyPS5 (chenxiao07) " + engine;
+        }
+
+        private static string ReadKytyVersionOld(string rootDirectory)
         {
             var dllPath = Path.Combine(rootDirectory, "Build", "RunHybrid", "kyty_gpu.dll");
             if (File.Exists(dllPath))
@@ -180,30 +190,14 @@ namespace DemonsSoulsPC.App.Services
             if (!Directory.Exists(installPath))
                 return false;
 
-            var requiredFiles = new[]
-            {
-                "DemonsSouls.exe",
-                "kyty_gpu.dll",
-                "akibot_host.dll",
-                "u59-preset.json",
-                "libs\\libc.prx",
-                "libs\\libkernel.prx",
-                "libs\\libScePad.prx",
-                "libs\\libSceAgc.prx",
-                "libs\\libSceAgcDriver.prx",
-                "libs\\libSceVideoOut.prx"
-            };
+            // 0.2: the engine (Build\Engine) and the game set up on it (dspc-game.json, with the dump's folder).
+            var requiredFiles = new[] { GameSetup.GameExe, GameSetup.RunScript, GameFeatures.FileName };
 
             foreach (var file in requiredFiles)
             {
                 if (!File.Exists(Path.Combine(installPath, file)))
                     return false;
             }
-
-            // Check app0 junction
-            var app0Path = Path.Combine(installPath, "app0");
-            if (!Directory.Exists(app0Path))
-                return false;
 
             return true;
         }
@@ -224,8 +218,11 @@ namespace DemonsSoulsPC.App.Services
             settings.GameTitleId = gameInfo.TitleId;
             _settingsManager.Save(settings);
 
-            // Run the build
-            var success = await _buildManager.BuildRunHybridAsync(gameDumpPath, progress);
+            // The setup (0.2: checks the dump and brings 0.1.x saves over; nothing is converted).
+            var report = new Progress<(int Percent, string Message)>(p =>
+                progress?.Report(new SetupStep { Name = p.Message, Description = p.Message, ProgressPercent = p.Percent }));
+            await new GameSetup(_rootDirectory).RunAsync(gameDumpPath, report);
+            var success = true;
 
             if (success)
             {
@@ -279,14 +276,9 @@ namespace DemonsSoulsPC.App.Services
         {
             await Task.Run(() =>
             {
-                var installPath = Path.Combine(_rootDirectory, "Build", "RunHybrid");
+                var installPath = GameSetup.EngineDirectory(_rootDirectory);
                 if (!Directory.Exists(installPath)) return;
-                GameSetup.DeleteTree(Path.Combine(installPath, "app0"));
-                foreach (var file in Directory.GetFiles(installPath, "DemonsSouls*.exe").Concat(Directory.GetFiles(installPath, "DemonsSouls*.json")))
-                {
-                    File.Delete(file);
-                }
-                GameSetup.DeleteTree(Path.Combine(installPath, "renderconfig-original"));
+                // The engine and the saves (_SaveData) stay; only the game set up is forgotten.
                 var features = Path.Combine(installPath, GameFeatures.FileName);
                 if (File.Exists(features)) File.Delete(features);
             });
@@ -307,7 +299,7 @@ namespace DemonsSoulsPC.App.Services
         public void OpenInstallFolder()
         {
             var settings = _settingsManager.Load();
-            var path = settings.InstallPath ?? Path.Combine(_rootDirectory, "Build", "RunHybrid");
+            var path = GameSetup.EngineDirectory(_rootDirectory);
             if (Directory.Exists(path))
             {
                 Process.Start("explorer.exe", path);
@@ -348,7 +340,7 @@ namespace DemonsSoulsPC.App.Services
         {
             try
             {
-                var (titleId, version) = GameSetup.ReadParam(Path.Combine(_rootDirectory, "Build", "RunHybrid", "app0"));
+                var (titleId, version) = GameSetup.ReadParam(GameFeatures.Load(GameSetup.EngineDirectory(_rootDirectory))?.Dump ?? "");
                 return (string.IsNullOrEmpty(titleId) ? null! : titleId, string.IsNullOrEmpty(version) ? null! : version);
             }
             catch

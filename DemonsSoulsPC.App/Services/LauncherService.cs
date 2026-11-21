@@ -1,7 +1,9 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using DemonsSoulsPC.App.Models;
@@ -19,243 +21,155 @@ namespace DemonsSoulsPC.App.Services
             _settingsManager = new SettingsManager(rootDirectory);
         }
 
-        // Starts the game directly (no script): the settings' variables, then the runtime defaults the old
-        // launch script applied, then DemonsSouls.exe in Build\RunHybrid with its output in Logs.
+        private string Engine => GameSetup.EngineDirectory(_rootDirectory);
+
+        // Starts the game: the engine's own launch script (Build\Engine\run-windows.ps1, hidden) with the options
+        // the settings give; it prepares the shaders when needed, starts kyty_emulator.exe and waits for it (-Follow).
         public async Task<int> LaunchGameAsync(AppSettings settings, HardwareInfo? hardware = null)
         {
-            var runHybrid = Path.Combine(_rootDirectory, "Build", "RunHybrid");
-            if (!File.Exists(Path.Combine(runHybrid, "DemonsSouls.exe")))
-            {
-                throw new FileNotFoundException("DemonsSouls.exe not found in RunHybrid", runHybrid);
-            }
-
+            CheckEngine();
             settings.LastLaunched = DateTime.Now;
             _settingsManager.Save(settings);
-            GameSetup.ApplyRenderConfig(_rootDirectory, settings.Lighting == 1);
-
-            return await StartGameAsync(BuildEnvironmentVariables(settings, hardware), Array.Empty<string>());
+            return await StartAsync(BuildArguments(settings, hardware), settings.Priority, settings);
         }
 
-        // DemonsSoulsPC.exe --run [game arguments]: the game with the runtime defaults only, the caller's environment
-        // and its arguments (measurement scripts: AKIBOT_* variables set beforehand, "-lvl <level>"...).
-        public Task<int> RunWithDefaultsAsync(string[] gameArgs)
+        // DemonsSoulsPC.exe --run [run-windows.ps1 options]: the game with the dump from the settings and only the
+        // given options (measurement scripts: "-Set KYTY_FPS_HUD=2", "-Width 1920 -Height 1080"...).
+        public Task<int> RunWithDefaultsAsync(string[] options)
         {
-            var runHybrid = Path.Combine(_rootDirectory, "Build", "RunHybrid");
-            if (!File.Exists(Path.Combine(runHybrid, "DemonsSouls.exe")))
-            {
-                throw new FileNotFoundException("DemonsSouls.exe not found in RunHybrid", runHybrid);
-            }
-            return StartGameAsync(new Dictionary<string, string>(), gameArgs);
+            CheckEngine();
+            var settings = _settingsManager.Load();
+            var args = new List<string> { "-Game", GameFolder(settings) };
+            args.AddRange(options);
+            return StartAsync(args, "");
         }
 
-        private async Task<int> StartGameAsync(Dictionary<string, string> variables, string[] gameArgs)
+        private void CheckEngine()
         {
-            var runHybrid = Path.Combine(_rootDirectory, "Build", "RunHybrid");
-            var psi = new ProcessStartInfo
-            {
-                WorkingDirectory = runHybrid,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
-            };
-            var env = psi.EnvironmentVariables;
-            foreach (var kvp in variables)
-            {
-                env[kvp.Key] = kvp.Value;
-            }
-            RuntimeDefaults.Apply(env, runHybrid);
+            if (!File.Exists(Path.Combine(Engine, GameSetup.GameExe)) || !File.Exists(Path.Combine(Engine, GameSetup.RunScript)))
+                throw new FileNotFoundException("kyty_emulator.exe or run-windows.ps1 not found in Build\\Engine", Engine);
+        }
 
-            psi.FileName = Path.Combine(runHybrid, env["AKIBOT_EXE"]);
-            var args = new List<string>();
-            if (env["AKIBOT_SKIP_INTRO"] == "1") args.Add("-skipIntro");
-            args.AddRange(gameArgs);
-            psi.Arguments = string.Join(" ", args.ConvertAll(a => a.Length > 0 && a.IndexOfAny(new[] { ' ', '\t', '"' }) < 0 ? a : "\"" + a.Replace("\"", "\\\"") + "\""));
+        private string GameFolder(AppSettings settings)
+        {
+            var dump = settings.GameDumpPath;
+            if (string.IsNullOrEmpty(dump) || !File.Exists(Path.Combine(dump, "eboot.bin")))
+                dump = GameFeatures.Load(Engine)?.Dump;
+            if (string.IsNullOrEmpty(dump) || !File.Exists(Path.Combine(dump, "eboot.bin")))
+                throw new DirectoryNotFoundException(Loc.T("The game folder (with eboot.bin) was not found: choose it again in the settings."));
+            return dump!;
+        }
+
+        private async Task<int> StartAsync(List<string> options, string priority, AppSettings? settings = null)
+        {
+            var args = new List<string> { "-Follow" };
+            args.AddRange(options);
+            var psi = GameSetup.PowerShell(Path.Combine(Engine, GameSetup.RunScript), args, Engine);
 
             var logs = Path.Combine(_rootDirectory, "Logs");
             Directory.CreateDirectory(logs);
-            // What the game is started with (Demon’s Souls PC, AnyPS5 and Kyty variables), to compare runs when one fails.
             try
             {
-                var launch = new List<string> { $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {psi.FileName} {psi.Arguments}" };
-                foreach (string key in env.Keys)
-                {
-                    var upper = key.ToUpperInvariant();
-                    if (upper.StartsWith("AKIBOT_") || upper.StartsWith("APS5_") || upper.StartsWith("ANYPS5_") || upper.StartsWith("KYTY_"))
-                        launch.Add($"{upper}={env[key]}");
-                }
-                launch.Sort(1, launch.Count - 1, StringComparer.Ordinal);
-                File.WriteAllLines(Path.Combine(logs, "dspc-launch.log"), launch);
+                File.WriteAllText(Path.Combine(logs, "dspc-launch.log"),
+                    $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] engine {GameSetup.EngineVersion(_rootDirectory)}\r\n{psi.FileName} {psi.Arguments}\r\n");
             }
             catch { }
-            using var outLog = new StreamWriter(Path.Combine(logs, "hybrid-run.out.log"), false);
-            using var errLog = new StreamWriter(Path.Combine(logs, "hybrid-run.err.log"), false);
+            // Logs\dspc-summary.txt (what RecompLauncher's report needs in one file) and the engine log's useful part.
+            using var report = new SessionReport(_rootDirectory, settings, psi.Arguments);
+            var outLog = new StreamWriter(Path.Combine(logs, "game-run.log"), false, new UTF8Encoding(false)) { AutoFlush = true };
             using var process = new Process { StartInfo = psi };
-            process.OutputDataReceived += (sender, e) => { if (e.Data != null) lock (outLog) outLog.WriteLine(e.Data); };
-            process.ErrorDataReceived += (sender, e) => { if (e.Data != null) lock (errLog) errLog.WriteLine(e.Data); };
-
+            process.OutputDataReceived += (sender, e) => { if (e.Data != null) { lock (outLog) outLog.WriteLine(e.Data); report.Output(e.Data); } };
+            process.ErrorDataReceived += (sender, e) => { if (e.Data != null) { lock (outLog) outLog.WriteLine(e.Data); report.Output(e.Data); } };
             process.Start();
-            RuntimeDefaults.SetPriority(process, env["AKIBOT_PRIORITY"]);
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
+            _ = Task.Run(() => SetEnginePriority(process, priority));
 
             // WaitForExit() without a timeout also waits for the end of both outputs.
             await Task.Run(() => process.WaitForExit());
+            lock (outLog) outLog.Dispose();
+            report.Finish(process.ExitCode);
             return process.ExitCode;
         }
 
-        private Dictionary<string, string> BuildEnvironmentVariables(AppSettings settings, HardwareInfo? hardware)
+        // The script starts the engine a little after it starts (shader inputs first, up to a minute the first time):
+        // its priority is set once it is there.
+        private static void SetEnginePriority(Process script, string priority)
         {
-            var env = new Dictionary<string, string>();
-
-            // Demon’s Souls PC in-game menu (F1 / Escape): reads and saves this same settings file, in the launcher's language.
-            env["AKIBOT_SETTINGS_FILE"] = Path.Combine(_rootDirectory, "Build", "dspc-settings.json");
-            env["AKIBOT_LANG"] = Loc.Language;
-
-            // Graphics card (issue #24): an explicit choice names the card for the AnyPS5 renderer.
-            // kyty_gpu.dll prefers a discrete card over integrated graphics by
-            // itself, so an automatic choice passes nothing and the renderer keeps that preference.
-            var gpu = hardware?.SelectedGpu;
-            if (hardware != null && hardware.SelectedGpuIndex >= 0 && gpu != null)
+            ProcessPriorityClass cls;
+            switch (priority)
             {
-                env["ANYPS5_GPU"] = GpuMatchToken(gpu.Name);
+                case "normal": return;
+                case "high": cls = ProcessPriorityClass.High; break;
+                case "abovenormal": cls = ProcessPriorityClass.AboveNormal; break;
+                default: return;
             }
-
-            // One game executable (no lighting or ultrawide variants: those were Astro Bot patches).
-            env["AKIBOT_EXE"] = GameSetup.GameExe;
-
-            // FPS limit
-            var fpsValues = new[] { "30", "35", "45", "50", "55", "60", "unlimited" };
-            if (settings.Fps >= 0 && settings.Fps < fpsValues.Length)
+            var until = DateTime.Now.AddMinutes(5);
+            while (DateTime.Now < until && !script.HasExited)
             {
-                env["AKIBOT_FPS_LIMIT"] = fpsValues[settings.Fps];
-            }
-
-            // Window size
-            // Indices 0..3 = 16:9, indices 4..5 = 21:9 ultrawide (#58)
-            var sizeValues = new[,] { { 1280, 720 }, { 1600, 900 }, { 1920, 1080 }, { 2560, 1440 }, { 2560, 1080 }, { 3440, 1440 } };
-            if (settings.Size >= 0 && settings.Size < sizeValues.GetLength(0))
-            {
-                int width = sizeValues[settings.Size, 0];
-                int height = sizeValues[settings.Size, 1];
-                env["KYTY_GPU_WIDTH"] = width.ToString();
-                env["KYTY_GPU_HEIGHT"] = height.ToString();
-            }
-
-            // Fullscreen
-            env["KYTY_GPU_FULLSCREEN"] = settings.Fullscreen ? "1" : "0";
-            // Started from RecompLauncher's Big Picture mode (controller, couch): always full screen.
-            if (Environment.GetEnvironmentVariable("RECOMPLAUNCHER_MODE") == "bigpicture")
-                env["KYTY_GPU_FULLSCREEN"] = "1";
-
-            // Performance overlay
-            var overlayValues = new[] { "", "fps", "compact", "full" };
-            if (settings.Overlay >= 0 && settings.Overlay < overlayValues.Length)
-            {
-                env["AKIBOT_OVERLAY"] = overlayValues[settings.Overlay];
-            }
-
-            // DLSS, FSR and frame generation: not tested on Demon’s Souls yet, hidden in the launcher; a settings file
-            // that still asks for them (in-game menu, RecompLauncher) is ignored.
-            settings.Upscale = 0;
-            settings.FrameGenMode = 0;
-            settings.LowLatency = false;
-            if (settings.Upscale != 0 || settings.FrameGenMode != 0)
-            {
-                env["AKIBOT_CUDA_HOLE"] = "1";
-                env["AKIBOT_DLSS_PATH"] = Path.Combine(_rootDirectory, "Build", "RunHybrid");
-            }
-            if (settings.Upscale == 6)
-            {
-                // AMD FSR 3.1 (Demon’s Souls PC): same pass as DLSS, amd_fidelityfx_vk.dll next to the game.
-                env["AKIBOT_FSR"] = "1";
-            }
-            else if (settings.Upscale != 0)
-            {
-                env["AKIBOT_DLSS"] = "1";
-                // Upscale: 1 Quality, 2 Balanced, 3 Performance, 4 Ultra Performance, 5 DLAA (DLSS preset).
-                var dlssModes = new[] { "quality", "quality", "balanced", "performance", "ultra", "dlaa" };
-                env["AKIBOT_DLSS_QUALITY"] = dlssModes[Math.Max(0, Math.Min(settings.Upscale, dlssModes.Length - 1))];
-            }
-
-            // Frame generation plan (AstroBotLauncher.FrameGenPlan): the game is never capped below 30.
-            // Auto with a target starts at 2x with the game capped at half the target and lets the game
-            // raise the multiplier; fixed modes cap the game at target / multiplier; no lock = uncapped.
-            if (settings.FrameGenMode == 5)
-            {
-                // AMD FSR 3 frame generation (Demon’s Souls PC): always 1 generated frame, the game at half the target.
-                var fsrTargets = new[] { 0, 50, 60, 90, 120, 144, 165 };
-                int fsrGoal = settings.FrameGenTarget >= 0 && settings.FrameGenTarget < fsrTargets.Length ? fsrTargets[settings.FrameGenTarget] : 60;
-                env["AKIBOT_FSRFG"] = "1";
-                env["AKIBOT_FPS_LIMIT"] = fsrGoal == 0 ? "unlimited" : Math.Max(30, fsrGoal / 2).ToString();
-            }
-            else if (settings.FrameGenMode != 0)
-            {
-                var targetValues = new[] { 0, 50, 60, 90, 120, 144, 165 };
-                int goal = settings.FrameGenTarget >= 0 && settings.FrameGenTarget < targetValues.Length
-                    ? targetValues[settings.FrameGenTarget] : 60;
-                int mult = settings.FrameGenMode == 1 ? 2 : Math.Min(Math.Max(settings.FrameGenMode, 2), 4);
-                int limit = goal == 0 ? 0 : Math.Max(30, goal / mult);
-                env["AKIBOT_DLSSG"] = "1";
-                env["AKIBOT_DLSSG_FRAMES"] = (mult - 1).ToString();
-                if (settings.FrameGenMode == 1 && goal != 0)
+                foreach (var p in Process.GetProcessesByName(Path.GetFileNameWithoutExtension(GameSetup.GameExe)))
                 {
-                    env["AKIBOT_DLSSG_TARGET"] = goal.ToString();
-                    env["AKIBOT_DLSSG_MAX_FRAMES"] = "3";
+                    try { p.PriorityClass = cls; return; } catch { }
                 }
-                env["AKIBOT_FPS_LIMIT"] = limit == 0 ? "unlimited" : limit.ToString();
+                System.Threading.Thread.Sleep(1000);
             }
-
-            // NVIDIA Reflex
-            if (settings.LowLatency)
-            {
-                env["AKIBOT_LOW_LATENCY"] = "1";
-            }
-
-            // Controller settings
-            var padValues = new[] { "auto", "ps", "xbox", "switch", "generic" };
-            if (settings.Controller >= 0 && settings.Controller < padValues.Length)
-            {
-                env["AKIBOT_PAD_PREFER"] = padValues[settings.Controller];
-            }
-
-            // Vibration strength in percent (0-200); the Switch boost follows it instead of being a flat
-            // 96 of 255, which made low strengths louder than the setting itself (#36).
-            int rumblePercent = settings.EffectiveRumblePercent;
-            env["AKIBOT_RUMBLE_SCALE"] = rumblePercent.ToString();
-            env["AKIBOT_RUMBLE_SWITCH_FLOOR"] = RumbleSetting.SwitchFloor(rumblePercent, settings.SwitchBoost).ToString();
-
-            // Wireless DualSense features (Bluetooth HID audio/haptics) - issue #34
-            env["AKIBOT_DS_WIRELESS_SPEAKER"] = settings.DualSenseWirelessSpeaker ? "1" : "0";
-            env["AKIBOT_DS_WIRELESS_HAPTICS"] = settings.DualSenseWirelessHaptics ? "1" : "0";
-
-            // Window title
-            env["AKIBOT_WINDOW_TITLE"] = "Demon’s Souls PC";
-
-            // Game language (AnyPS5 console language number); Auto maps the Windows display language.
-            int language = settings.Language >= 0 && settings.Language <= 30 ? settings.Language : WindowsLanguage();
-            env["ANYPS5_LANGUAGE"] = language.ToString();
-
-            // VSync: Vulkan FIFO presentation (the default is immediate presentation; skipped when DLSS Frame Generation is active).
-            if (settings.VSync && settings.FrameGenMode == 0) env["KYTY_GPU_PRESENT_MODE"] = "Fifo";
-
-            // Advanced page: variables RuntimeDefaults reads (it keeps its defaults when unset).
-            if (settings.HangWatchdog) env["AKIBOT_HANG_WATCHDOG"] = "1";
-            if (!settings.ShaderCache) env["AKIBOT_SHADER_CACHE"] = "0";
-            env["AKIBOT_DRAW_PREP_TUNING"] = settings.DrawPrepTuning ? "1" : "0";
-            if (settings.Priority == "normal" || settings.Priority == "abovenormal" || settings.Priority == "high")
-                env["AKIBOT_PRIORITY"] = settings.Priority;
-            if (settings.CpPriority == 1 || settings.CpPriority == 2) env["KYTY_CP_PRIORITY"] = settings.CpPriority.ToString();
-            if (!settings.TriggerState) env["APS5_PAD_TRIGGER_STATE"] = "0";
-
-            env["APS5_SAVEDATA_TRANSFER_FALLBACK"] = "1";
-
-            return env;
         }
 
-        // The renderer selects a card by name (ANYPS5_GPU, a case-insensitive substring of the Vulkan
-        // device name). The model token is used instead of the full Windows name so it still matches
-        // the shorter name Vulkan reports ("NVIDIA GeForce RTX 4050 Laptop GPU" -> "RTX 4050").
+        // The settings as run-windows.ps1 options (the same ones the engine's own launcher passes).
+        public List<string> BuildArguments(AppSettings settings, HardwareInfo? hardware)
+        {
+            var args = new List<string> { "-Game", GameFolder(settings) };
+            var sets = new List<string>();
+
+            // Window size; indices 4 and 5 are 21:9 (the game renders its 3D wider: -Aspect 21:9).
+            var sizeValues = new[,] { { 1280, 720 }, { 1600, 900 }, { 1920, 1080 }, { 2560, 1440 }, { 2560, 1080 }, { 3440, 1440 } };
+            int size = settings.Size >= 0 && settings.Size < sizeValues.GetLength(0) ? settings.Size : 2;
+            args.AddRange(new[] { "-Width", sizeValues[size, 0].ToString(), "-Height", sizeValues[size, 1].ToString() });
+            if (size >= 4) args.AddRange(new[] { "-Aspect", "21:9" });
+
+            // Full screen; RecompLauncher's Big Picture mode (controller, couch) always.
+            if (settings.Fullscreen || Environment.GetEnvironmentVariable("RECOMPLAUNCHER_MODE") == "bigpicture")
+                args.Add("-Fullscreen");
+
+            // Frame rate: 0 = 30 (KYTY_FLIP_RATE=1, steady half rate), 1 = 60 (the game's own), 2 = up to 120.
+            if (settings.Fps == 0) sets.Add("KYTY_FLIP_RATE=1");
+            else if (settings.Fps == 2) args.Add("-Fps120");
+
+            if (settings.VSync) args.AddRange(new[] { "-PresentMode", "Fifo" });
+            if (settings.LowLatency) args.Add("-LowLatency");
+
+            // Graphics: 0 standard (as on the PS5), 1 low, 2 lowest (shorter shadows and distant detail, smaller
+            // textures): faster where the processor or the video memory limits.
+            if (settings.Lighting == 1) args.AddRange(new[] { "-Quality", "low", "-TextureReduce", "1" });
+            else if (settings.Lighting == 2) args.AddRange(new[] { "-Quality", "lowest", "-TextureReduce", "2" });
+
+            // Upscaling: 6 = AMD FSR (built into the engine, any graphics card); the others stay the game's own.
+            if (settings.Upscale == 6) args.AddRange(new[] { "-Upscaler", "fsr", "-OutputHeight", Math.Max(1080, Math.Min(2159, sizeValues[size, 1])).ToString() });
+
+            // Performance overlay (F8 in the game switches it): 1 frame rate, 2 detailed.
+            if (settings.Overlay >= 1) sets.Add($"KYTY_FPS_HUD={Math.Min(settings.Overlay, 2)}");
+
+            // Shader preparation (the PS5 shaders translated for this PC, kept in _PipelineCache\static\*.prefetch): done
+            // before the game starts, on every thread but two. Left to the engine it runs beside the game on 2-4 threads
+            // for minutes, and a session closed early starts it over: 17 s instead on a 16-thread PC, nothing once cached.
+            sets.Add($"KYTY_SHADER_PREFETCH_THREADS={Math.Max(4, Environment.ProcessorCount - 2)}");
+            sets.Add("KYTY_PREFETCH_WAIT=1");
+
+            // Console language; Auto maps the Windows display language.
+            int language = settings.Language >= 0 && settings.Language <= 30 ? settings.Language : WindowsLanguage();
+            args.AddRange(new[] { "-Language", language.ToString() });
+
+            // Graphics card: an explicit choice names it (a part of its Vulkan name); automatic = the first discrete one.
+            var gpu = hardware?.SelectedGpu;
+            if (hardware != null && hardware.SelectedGpuIndex >= 0 && gpu != null)
+                args.AddRange(new[] { "-Gpu", GpuMatchToken(gpu.Name) });
+
+            if (sets.Count > 0) args.AddRange(new[] { "-Set", string.Join(",", sets) });
+            return args;
+        }
+
+        // The engine selects a card by a part of its name (KYTY_GPU). The model token is used instead of the full
+        // Windows name so it still matches the shorter name Vulkan reports ("NVIDIA GeForce RTX 4050 Laptop GPU" -> "RTX 4050").
         public static string GpuMatchToken(string name)
         {
             var match = Regex.Match(name, @"(?:RTX|GTX)\s*\d{3,4}(?:\s*(?:Ti|SUPER))?", RegexOptions.IgnoreCase);
@@ -315,8 +229,7 @@ namespace DemonsSoulsPC.App.Services
 
         public bool IsGameRunning()
         {
-            var processes = Process.GetProcessesByName(Path.GetFileNameWithoutExtension(GameSetup.GameExe));
-            return processes.Length > 0;
+            return Process.GetProcessesByName(Path.GetFileNameWithoutExtension(GameSetup.GameExe)).Length > 0;
         }
 
         public void KillGameProcesses()
