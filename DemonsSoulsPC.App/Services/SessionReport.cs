@@ -12,15 +12,19 @@ using DemonsSoulsPC.App.Models;
 
 namespace DemonsSoulsPC.App.Services
 {
-    // Logs\dspc-summary.txt: one short file (in French, for the developer) that says what a player's last session looked
-    // like, so a report sent through RecompLauncher (which packs the Logs folder and keeps only ~2 MB) is enough: the
-    // PC, the versions, the settings, the shaders' state, the frame rate (read every second from the game window's
-    // title, "fps: 60"), the problems the engine logged and how the game ended. Rewritten every 30 seconds and at the
-    // end, so it is there even when the launcher is killed with the game. At the end, Logs\engine-last.log gets the
-    // useful part of the engine's own log (Build\Engine\logs, outside the report), and old logs are cleared.
+    // Logs\dspc-summary.log: one short file (in French, for the developer) that says what a player's last session looked
+    // like: the PC, the versions, the settings, the shaders' state, the frame rate (read every second from the game
+    // window's title, "fps: 60"), the problems the engine logged and how the game ended. Rewritten every 30 seconds and
+    // at the end, so it is there even when the launcher is killed with the game. At the end, Logs\engine-last.log gets
+    // the useful part of the engine's own log (Build\Engine\logs, outside the report), and old logs are cleared.
+    // A RecompLauncher review sends ONE file only, a .log of the Logs folder (never a .txt: 0.2.0's dspc-summary.txt was
+    // never sent; players' reports came with engine-last.log or game-run.log, and only their end, ~2 MB). So the
+    // summary is a .log, the final one is also appended at the end of engine-last.log and game-run.log (the part a
+    // report keeps), and dspc-summary.log is written last (the newest .log), whichever file the review picks.
     public sealed class SessionReport : IDisposable
     {
-        public const string FileName = "dspc-summary.txt";
+        public const string FileName = "dspc-summary.log";
+        private const string OldFileName = "dspc-summary.txt";
         public const string EngineCopy = "engine-last.log";
 
         private static readonly Regex FpsInTitle = new Regex(@"fps:\s*(\d+)", RegexOptions.Compiled);
@@ -71,9 +75,23 @@ namespace DemonsSoulsPC.App.Services
             lock (_lock) _exitCode = exitCode;
             _sampler.Change(Timeout.Infinite, Timeout.Infinite);
             _writer.Change(Timeout.Infinite, Timeout.Infinite);
-            Write();
-            try { CopyEngineLog(); } catch { }
-            try { TrimLog(Path.Combine(_root, "Logs", "game-run.log"), 300 * 1024); } catch { }
+            string text;
+            lock (_lock) text = Build();
+            var logs = Path.Combine(_root, "Logs");
+            bool engineCopied = false;
+            try { engineCopied = CopyEngineLog(); } catch { }
+            try { TrimLog(Path.Combine(logs, "game-run.log"), 300 * 1024); } catch { }
+            // The summary at the end of both logs a review may send (their end is what it keeps), then on its own, last.
+            if (engineCopied) try { AppendSummary(Path.Combine(logs, EngineCopy), text); } catch { }
+            try { AppendSummary(Path.Combine(logs, "game-run.log"), text); } catch { }
+            try { File.WriteAllText(_summaryPath, text, new UTF8Encoding(true)); } catch { }
+        }
+
+        private static void AppendSummary(string path, string summary)
+        {
+            if (!File.Exists(path)) return;
+            File.AppendAllText(path, Environment.NewLine + "==================== " + FileName + " (résumé de la partie) ====================" + Environment.NewLine
+                + summary, new UTF8Encoding(false));
         }
 
         public void Dispose()
@@ -211,9 +229,10 @@ namespace DemonsSoulsPC.App.Services
             return s.ToString();
         }
 
-        private void CopyEngineLog()
+        // False when this session has no engine log (the engine never started): engine-last.log is then an older session's.
+        private bool CopyEngineLog()
         {
-            if (_engineLogStem == null) return;
+            if (_engineLogStem == null) return false;
             var engine = GameSetup.EngineDirectory(_root);
             var outLines = ReadShared(Path.Combine(engine, _engineLogStem + ".out.log"));
             var errLines = ReadShared(Path.Combine(engine, _engineLogStem + ".err.log"));
@@ -227,6 +246,7 @@ namespace DemonsSoulsPC.App.Services
             var text = s.ToString();
             if (text.Length > 600 * 1024) text = text.Substring(text.Length - 600 * 1024);
             File.WriteAllText(Path.Combine(_root, "Logs", EngineCopy), text, new UTF8Encoding(true));
+            return true;
         }
 
         // Keeps the report small: the engine's 10 last sessions and 2 last precompiles, no 0.1 logs, long logs cut.
@@ -244,7 +264,7 @@ namespace DemonsSoulsPC.App.Services
                     GameSetup.DeleteTree(dir);
             }
             var logs = Path.Combine(root, "Logs");
-            foreach (var old in new[] { "hybrid-run.out.log", "hybrid-run.err.log", "setup-relinker.log" })
+            foreach (var old in new[] { "hybrid-run.out.log", "hybrid-run.err.log", "setup-relinker.log", OldFileName })
                 try { File.Delete(Path.Combine(logs, old)); } catch { }
             foreach (var log in new[] { "dspc-error.log", "dspc-debug.log", "setup.log" })
                 try { TrimLog(Path.Combine(logs, log), 200 * 1024); } catch { }

@@ -104,6 +104,13 @@ namespace DemonsSoulsPC.App
                 PrecompileWithoutWindow();
                 return;
             }
+            // DemonsSoulsPC.exe --translate: only the engine's shader translation (the precompile's second step), without a
+            // window; exit code 0 when done. Log in Logs\precompile.log ("translation:" lines).
+            if (e.Args.Length == 1 && e.Args[0] == "--translate")
+            {
+                TranslateWithoutWindow();
+                return;
+            }
             // DemonsSoulsPC.exe --remove-game: removes what the setup built (Installation page, Uninstall).
             if (e.Args.Length == 1 && e.Args[0] == "--remove-game")
             {
@@ -255,6 +262,7 @@ namespace DemonsSoulsPC.App
             catch (Exception ex)
             {
                 try { Console.Error.WriteLine(ex.Message); } catch { }
+                ShowVersionRefusal(ex);
                 Shutdown(2);
             }
         }
@@ -310,6 +318,7 @@ namespace DemonsSoulsPC.App
             catch (Exception ex)
             {
                 Services.GameSetup.AppendLog(log, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] FAILED: {ex}\r\n");
+                ShowVersionRefusal(ex);
                 Shutdown(2);
             }
         }
@@ -355,6 +364,7 @@ namespace DemonsSoulsPC.App
             {
                 try { Services.GameSetup.AppendLog(log, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] FAILED: {ex}\r\n"); } catch { }
                 try { Console.Error.WriteLine(ex.Message); } catch { }
+                ShowVersionRefusal(ex);
                 Shutdown(2);
             }
         }
@@ -384,6 +394,7 @@ namespace DemonsSoulsPC.App
             catch (Exception ex)
             {
                 try { Services.GameSetup.AppendLog(log, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] FAILED: {ex}\r\n"); } catch { }
+                ShowVersionRefusal(ex);
                 Shutdown(2);
             }
         }
@@ -403,6 +414,23 @@ namespace DemonsSoulsPC.App
             catch (Exception ex)
             {
                 LogException(ex);
+                ShowVersionRefusal(ex);
+                Shutdown(2);
+            }
+        }
+
+        private async void TranslateWithoutWindow()
+        {
+            try
+            {
+                ShutdownMode = ShutdownMode.OnExplicitShutdown;
+                var ok = await new LauncherService(GetRootDirectory()).PrefetchShadersAsync(null, System.Threading.CancellationToken.None);
+                Shutdown(ok ? 0 : 1);
+            }
+            catch (Exception ex)
+            {
+                LogException(ex);
+                ShowVersionRefusal(ex);
                 Shutdown(2);
             }
         }
@@ -416,6 +444,7 @@ namespace DemonsSoulsPC.App
             catch (Exception ex)
             {
                 LogException(ex);
+                ShowVersionRefusal(ex);
                 Shutdown(2);
             }
         }
@@ -430,6 +459,7 @@ namespace DemonsSoulsPC.App
             catch (Exception ex)
             {
                 LogException(ex);
+                ShowVersionRefusal(ex);
                 Shutdown(2);
             }
         }
@@ -495,6 +525,14 @@ namespace DemonsSoulsPC.App
                 }
             }
             return null;
+        }
+
+        // The game version refusal (GameFeatures.EnsureSupportedVersion) is shown even without a window: RecompLauncher's
+        // --prepare and --play would otherwise end with only a log line.
+        private static void ShowVersionRefusal(Exception ex)
+        {
+            if (ex is UnsupportedGameVersionException)
+                try { MessageBox.Show(ex.Message, "Demon’s Souls PC", MessageBoxButton.OK, MessageBoxImage.Warning); } catch { }
         }
 
         private void LogException(Exception? ex)

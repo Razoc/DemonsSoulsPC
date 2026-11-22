@@ -9,7 +9,6 @@ namespace DemonsSoulsPC.App.Services
     {
         private const long MinEbootSize = 30_000_000; // Demon’s Souls: 45.7 MB (01.007.000)
         private const string ExpectedTitleId = "PPSA01341";
-        private const string ExpectedVersion = "01.007.000";
 
         public async Task<GameInfo> ValidateGameDumpAsync(string gamePath)
         {
@@ -64,8 +63,14 @@ namespace DemonsSoulsPC.App.Services
                     return gameInfo;
                 }
 
-                // Any version is accepted; ones other than the tested one get a note, not a refusal.
-                bool testedVersion = string.IsNullOrEmpty(gameInfo.Version) || gameInfo.Version == ExpectedVersion;
+                // Only 01.005 and 01.007: the engine's game patches find their code in no other version.
+                var versionError = GameFeatures.UnsupportedVersionMessage(gamePath);
+                if (versionError != null)
+                {
+                    gameInfo.IsValid = false;
+                    gameInfo.ValidationError = versionError;
+                    return gameInfo;
+                }
 
                 // A normal extracted dump has a data directory.  A streamed ZArchive dump has
                 // app0.zar instead, so do not make users create a meaningless empty data folder
@@ -93,10 +98,6 @@ namespace DemonsSoulsPC.App.Services
 
                 gameInfo.IsValid = true;
                 gameInfo.ValidationError = null;
-                if (!testedVersion)
-                {
-                    gameInfo.Version += Loc.T(" (not tested; features this version does not support turn themselves off)");
-                }
                 return gameInfo;
             }
             catch (Exception ex)

@@ -22,10 +22,10 @@
   },
   "exit_codes": {
     "0": "ok",
-    "-1073741819": "Demon's Souls PC stopped because of a crash. Please send a report from the launcher: it includes Logs/dspc-summary.txt, which tells us your PC, settings and what went wrong.",
-    "3221225477": "Demon's Souls PC stopped because of a crash. Please send a report from the launcher: it includes Logs/dspc-summary.txt, which tells us your PC, settings and what went wrong.",
-    "-1073740791": "Demon's Souls PC stopped because of a crash. Please send a report from the launcher: it includes Logs/dspc-summary.txt, which tells us your PC, settings and what went wrong.",
-    "3221226505": "Demon's Souls PC stopped because of a crash. Please send a report from the launcher: it includes Logs/dspc-summary.txt, which tells us your PC, settings and what went wrong.",
+    "-1073741819": "Demon's Souls PC stopped because of a crash. Please send a report from the launcher: it includes Logs/dspc-summary.log, which tells us your PC, settings and what went wrong.",
+    "3221225477": "Demon's Souls PC stopped because of a crash. Please send a report from the launcher: it includes Logs/dspc-summary.log, which tells us your PC, settings and what went wrong.",
+    "-1073740791": "Demon's Souls PC stopped because of a crash. Please send a report from the launcher: it includes Logs/dspc-summary.log, which tells us your PC, settings and what went wrong.",
+    "3221226505": "Demon's Souls PC stopped because of a crash. Please send a report from the launcher: it includes Logs/dspc-summary.log, which tells us your PC, settings and what went wrong.",
     "-1073741515": "A file the game needs is missing (a DLL). Reinstall Demon's Souls PC from the launcher.",
     "3221225781": "A file the game needs is missing (a DLL). Reinstall Demon's Souls PC from the launcher.",
     "2": "Demon's Souls PC could not start the game. Please send a report from the launcher: Logs/dspc-error.log says why."

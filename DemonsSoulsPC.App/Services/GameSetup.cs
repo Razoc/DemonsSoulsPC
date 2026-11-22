@@ -25,6 +25,27 @@ namespace DemonsSoulsPC.App.Services
         public const string TestedVersion = "01.007.000";
         public static readonly string[] TestedVersions = { "01.007.000", "01.005.000" };
 
+        // The engine's game patches (idle wait, memory, texture streaming, render size...) only find their code in
+        // 01.005 and 01.007: other versions run without them, far slower and with more stutter, so they are refused.
+        public static bool IsSupportedVersion(string? version) => TestedVersions.Contains(version ?? "");
+
+        // Null when the dump's version is supported, else the message to show.
+        public static string? UnsupportedVersionMessage(string dump)
+        {
+            string version;
+            try { version = GameSetup.ReadParam(dump).Version; } catch { version = ""; }
+            if (IsSupportedVersion(version)) return null;
+            return string.IsNullOrEmpty(version)
+                ? Loc.T("The game version could not be read (sce_sys/param.json). Demon’s Souls PC needs version 01.005 or 01.007 of the game (01.007 recommended).")
+                : Loc.T("Game version {0} is not supported. Demon’s Souls PC needs version 01.005 or 01.007 of the game (01.007 recommended): update your dump with the 01.007 patch, then choose it again.", version);
+        }
+
+        public static void EnsureSupportedVersion(string dump)
+        {
+            var message = UnsupportedVersionMessage(dump);
+            if (message != null) throw new UnsupportedGameVersionException(message);
+        }
+
         public static GameFeatures? Load(string engineDir)
         {
             try
@@ -37,6 +58,12 @@ namespace DemonsSoulsPC.App.Services
                 return null;
             }
         }
+    }
+
+    // The game version refusal: shown in a message box even by the windowless --prepare and --play.
+    public class UnsupportedGameVersionException : InvalidOperationException
+    {
+        public UnsupportedGameVersionException(string message) : base(message) { }
     }
 
     // Since 0.2 the game runs on the KytyPS5 engine tuned for Demon's Souls (chenxiao07/KytyPS5, Build\Engine), which
@@ -100,8 +127,11 @@ namespace DemonsSoulsPC.App.Services
             Directory.CreateDirectory(Path.GetDirectoryName(logPath)!);
             void Log(string line) => AppendLog(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {line}\r\n");
             Log($"setup from {dump}: {titleId} {version}, engine {EngineVersion(_root)}");
-            if (!GameFeatures.TestedVersions.Contains(version))
-                Log($"warning: version {version} is not one the engine is tested with ({string.Join(", ", GameFeatures.TestedVersions)})");
+            if (!GameFeatures.IsSupportedVersion(version))
+            {
+                Log($"refused: version {version} is not supported ({string.Join(", ", GameFeatures.TestedVersions)})");
+                GameFeatures.EnsureSupportedVersion(dump);
+            }
 
             Report(20, Loc.T("Bringing your saves over..."));
             MigrateSaves(titleId, Log);
@@ -194,7 +224,10 @@ namespace DemonsSoulsPC.App.Services
             if (drivers.Any(d => d.IndexOf("NVIDIA", StringComparison.OrdinalIgnoreCase) >= 0))
                 drivers.RemoveAll(d => d.IndexOf("NVIDIA", StringComparison.OrdinalIgnoreCase) < 0);
             drivers.Sort(StringComparer.Ordinal);
-            return EngineVersion(root) + " | " + string.Join("; ", drivers);
+            // "full+translation": a marker of 0.2.0's quick run (-Quick) does not count any more (players' reports: a quarter
+            // of the pipelines play met were missing, compiled in play with freezes of up to 18 s), nor one without the
+            // engine's shader translation (PrecompileAsync's second step).
+            return EngineVersion(root) + " | " + string.Join("; ", drivers) + " | full+translation";
         }
 
         public static bool PrecompileNeeded(string root)
@@ -224,15 +257,14 @@ namespace DemonsSoulsPC.App.Services
         // with the CPU fully loaded; stopping it keeps what is done and the next run continues. Progress from its
         // "shards: 120 of 1096 done (10%)" lines; output in Logs\precompile.log.
         public static async Task<int> PrecompileAsync(string root, string dump, IProgress<(int Percent, string Message)>? progress,
-            System.Threading.CancellationToken cancel = default, bool quick = false)
+            System.Threading.CancellationToken cancel = default)
         {
             var engine = EngineDirectory(root);
             var logs = Path.Combine(root, "Logs");
             Directory.CreateDirectory(logs);
-            // -Quick: only the shaders as recorded play specialized them (the release's hints: other players' tours of every
-            // world, and this PC's play), about half of a full run; the rest is the seeds' guesses play hardly meets.
+            // Always the full run: every shader and pipeline of the game. (0.2.0's -Quick left about a quarter of the
+            // pipelines play met, compiled in play with freezes of up to 18 s in players' reports.)
             var arguments = new List<string> { "-Game", dump };
-            if (quick) arguments.Add("-Quick");
             var psi = PowerShell(Path.Combine(engine, PrecompileScript), arguments, engine);
             using var log = new StreamWriter(Path.Combine(logs, "precompile.log"), false, new UTF8Encoding(false)) { AutoFlush = true };
             using var process = new Process { StartInfo = psi };
@@ -249,7 +281,7 @@ namespace DemonsSoulsPC.App.Services
                 else if (text.IndexOf(" merging the shards", StringComparison.OrdinalIgnoreCase) >= 0)
                     progress?.Report((-1, Loc.T("Prep.Merging")));
                 else if (text.IndexOf("ready to play", StringComparison.OrdinalIgnoreCase) >= 0)
-                    progress?.Report((-1, Loc.T("Ready to play: the rest of the shaders follow.")));
+                    progress?.Report((-1, Loc.T("Prep.CommonReady")));
             }
             process.OutputDataReceived += (s, e) => Line(e.Data);
             process.ErrorDataReceived += (s, e) => Line(e.Data);
@@ -258,9 +290,22 @@ namespace DemonsSoulsPC.App.Services
             process.BeginErrorReadLine();
             using (cancel.Register(() => KillTree(process)))
                 await Task.Run(() => process.WaitForExit());
-            if (process.ExitCode == 0 && !cancel.IsCancellationRequested) MarkPrecompiled(root);
-            return process.ExitCode;
+            lock (log) log.Dispose(); // the translation step appends to the same file
+            if (process.ExitCode != 0 || cancel.IsCancellationRequested) return process.ExitCode;
+
+            // Then the engine's shader translation (what showed "Preparing shaders" before or during play): done here
+            // too, so the game starts with nothing left to prepare.
+            bool translated;
+            try { translated = await new LauncherService(root).PrefetchShadersAsync(progress, cancel); }
+            catch (Exception ex) { AppendLog(Path.Combine(logs, "precompile.log"), "translation: " + ex + "\r\n"); translated = false; }
+            if (cancel.IsCancellationRequested) return process.ExitCode;
+            if (!translated) return TranslationFailed;
+            MarkPrecompiled(root);
+            return 0;
         }
+
+        // PrecompileAsync's code when the pipelines were compiled but the engine's shader translation did not finish.
+        public const int TranslationFailed = 90;
 
         // Windows PowerShell running one of the engine's scripts without a window (the user never opens a script).
         public static ProcessStartInfo PowerShell(string script, IEnumerable<string> arguments, string workingDirectory)

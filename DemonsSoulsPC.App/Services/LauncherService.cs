@@ -41,7 +41,131 @@ namespace DemonsSoulsPC.App.Services
             var settings = _settingsManager.Load();
             var args = new List<string> { "-Game", GameFolder(settings) };
             args.AddRange(options);
+            // The shader translation before the game, as Play does (without it the engine translates beside the game, its
+            // "Preparing shaders" bar over play), unless the options set the engine's variables themselves.
+            if (!options.Any(o => o.Equals("-Set", StringComparison.OrdinalIgnoreCase)))
+                args.AddRange(new[] { "-Set", string.Join(",", PrefetchSets()) });
             return StartAsync(args, "");
+        }
+
+        private static IEnumerable<string> PrefetchSets() => new[]
+        {
+            $"KYTY_SHADER_PREFETCH_THREADS={Math.Max(4, Environment.ProcessorCount - 2)}",
+            "KYTY_PREFETCH_WAIT=1",
+        };
+
+        private static readonly Regex EngineLogLine = new Regex(@"logs:\s*(\S+)\.\*\.log", RegexOptions.Compiled);
+        private static readonly Regex TitleProgress = new Regex(@"(\d+)\s*/\s*(\d+)", RegexOptions.Compiled);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool ShowWindow(IntPtr window, int command);
+
+        // The engine's shader translation (the PS5 shaders into SPIR-V, _PipelineCache\static\*.prefetch), the part of the
+        // shader preparation the precompile does not do: without it the first Play holds the game behind the engine's
+        // "Preparing shaders" bar (minutes on a small processor). The engine has no "translate and quit": it is started
+        // as Play starts it (same options, so the same cache key), held by KYTY_PREFETCH_WAIT=1 before the game's first
+        // instruction, its window hidden, and stopped once its log says the wait is over ("Shader prefetch wait: done",
+        // written after the cache index is saved). True when the translation is done (or the engine runs none).
+        public async Task<bool> PrefetchShadersAsync(IProgress<(int Percent, string Message)>? progress, System.Threading.CancellationToken cancel)
+        {
+            CheckEngine();
+            var settings = _settingsManager.Load();
+            var args = BuildArguments(settings, null);
+            args.RemoveAll(a => a == "-Fullscreen");
+            for (int i = 0; i + 1 < args.Count; i++)
+            {
+                if (args[i] == "-Width") args[i + 1] = "640";
+                if (args[i] == "-Height") args[i + 1] = "360";
+            }
+            // The hold's own limit (600 s by default) would let the game start on a slow PC: up to two hours here.
+            int set = args.IndexOf("-Set");
+            if (set >= 0 && set + 1 < args.Count) args[set + 1] += ",KYTY_PREFETCH_WAIT_S=7200";
+            else args.AddRange(new[] { "-Set", "KYTY_PREFETCH_WAIT_S=7200" });
+            args.Insert(0, "-Follow");
+
+            var logs = Path.Combine(_rootDirectory, "Logs");
+            Directory.CreateDirectory(logs);
+            var logPath = Path.Combine(logs, "precompile.log");
+            void Log(string line) => GameSetup.AppendLog(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] translation: {line}\r\n");
+
+            var psi = GameSetup.PowerShell(Path.Combine(Engine, GameSetup.RunScript), args, Engine);
+            Log(psi.Arguments);
+            string? stem = null;
+            using var process = new Process { StartInfo = psi };
+            process.OutputDataReceived += (s, e) => { if (e.Data != null) { var m = EngineLogLine.Match(e.Data); if (m.Success) stem = m.Groups[1].Value; } };
+            process.ErrorDataReceived += (s, e) => { };
+            process.Start();
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+            progress?.Report((-1, Loc.T("Prep.Translating")));
+
+            bool? result = null;
+            var hidden = new HashSet<IntPtr>();
+            var started = DateTime.Now;
+            int tick = 0;
+            using (cancel.Register(() => GameSetup.KillTree(process)))
+            {
+                while (result == null && !process.HasExited && !cancel.IsCancellationRequested)
+                {
+                    await Task.Delay(250).ConfigureAwait(false);
+                    tick++;
+                    foreach (var engine in Process.GetProcessesByName(Path.GetFileNameWithoutExtension(GameSetup.GameExe)))
+                    {
+                        try
+                        {
+                            if (!string.Equals(engine.MainModule?.FileName, Path.Combine(Engine, GameSetup.GameExe), StringComparison.OrdinalIgnoreCase)) continue;
+                            var window = engine.MainWindowHandle;
+                            if (window != IntPtr.Zero && hidden.Add(window)) ShowWindow(window, 0); // SW_HIDE
+                            var match = TitleProgress.Match(engine.MainWindowTitle ?? "");
+                            if (match.Success && int.TryParse(match.Groups[2].Value, out var total) && total > 0)
+                            {
+                                var done = int.Parse(match.Groups[1].Value);
+                                progress?.Report((Math.Min(100, done * 100 / total), string.Format(Loc.T("Prep.TranslatingCount"), done, total)));
+                            }
+                        }
+                        catch { }
+                    }
+                    if (stem == null || tick % 4 != 0) continue; // the log once a second
+                    foreach (var line in ReadShared(Path.Combine(Engine, stem + ".out.log")))
+                    {
+                        if (!line.StartsWith("Shader prefetch wait:", StringComparison.Ordinal) || line.Contains("the game starts once")) continue;
+                        Log(line);
+                        result = line.Contains(": done") || line.Contains("no shader prefetch runs");
+                        break;
+                    }
+                }
+            }
+            GameSetup.KillTree(process);
+            // The engine gone before the game (or the next step) starts: a few seconds, then stopped outright.
+            for (int wait = 0; wait < 40; wait++)
+            {
+                var left = Process.GetProcessesByName(Path.GetFileNameWithoutExtension(GameSetup.GameExe)).Where(p =>
+                {
+                    try { return string.Equals(p.MainModule?.FileName, Path.Combine(Engine, GameSetup.GameExe), StringComparison.OrdinalIgnoreCase); }
+                    catch { return false; }
+                }).ToList();
+                if (left.Count == 0) break;
+                if (wait == 20) foreach (var p in left) try { p.Kill(); } catch { }
+                await Task.Delay(250).ConfigureAwait(false);
+            }
+            if (result == null) Log(cancel.IsCancellationRequested ? "stopped" : $"the engine ended first (code {(process.HasExited ? process.ExitCode : -1)})");
+            Log($"{(result == true ? "done" : "not done")} in {(DateTime.Now - started).TotalSeconds:0} s");
+            return result == true;
+        }
+
+        private static List<string> ReadShared(string path)
+        {
+            var lines = new List<string>();
+            try
+            {
+                if (!File.Exists(path)) return lines;
+                using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+                using var reader = new StreamReader(stream);
+                string? line;
+                while ((line = reader.ReadLine()) != null) lines.Add(line);
+            }
+            catch { }
+            return lines;
         }
 
         private void CheckEngine()
@@ -57,6 +181,7 @@ namespace DemonsSoulsPC.App.Services
                 dump = GameFeatures.Load(Engine)?.Dump;
             if (string.IsNullOrEmpty(dump) || !File.Exists(Path.Combine(dump, "eboot.bin")))
                 throw new DirectoryNotFoundException(Loc.T("The game folder (with eboot.bin) was not found: choose it again in the settings."));
+            GameFeatures.EnsureSupportedVersion(dump!);
             return dump!;
         }
 
@@ -74,7 +199,8 @@ namespace DemonsSoulsPC.App.Services
                     $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] engine {GameSetup.EngineVersion(_rootDirectory)}\r\n{psi.FileName} {psi.Arguments}\r\n");
             }
             catch { }
-            // Logs\dspc-summary.txt (what RecompLauncher's report needs in one file) and the engine log's useful part.
+            // Logs\dspc-summary.log (what RecompLauncher's report needs in one file, also appended to the logs it may send)
+            // and the engine log's useful part.
             using var report = new SessionReport(_rootDirectory, settings, psi.Arguments);
             var outLog = new StreamWriter(Path.Combine(logs, "game-run.log"), false, new UTF8Encoding(false)) { AutoFlush = true };
             using var process = new Process { StartInfo = psi };

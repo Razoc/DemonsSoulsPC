@@ -211,9 +211,12 @@ namespace DemonsSoulsPC.App.Services
             ["Setting the game up on the new engine..."] = "Mise en place du jeu sur le nouveau moteur...",
             ["Precompiling shaders..."] = "Précompilation des shaders...",
             ["Precompiling shaders: {0} of {1}"] = "Précompilation des shaders : {0} sur {1}",
-            ["Ready to play: the rest of the shaders follow."] = "Prêt à jouer : le reste des shaders suit.",
             ["Precompile stopped: the next run continues."] = "Précompilation arrêtée : la prochaine reprendra là.",
             ["Shaders precompiled."] = "Shaders précompilés.",
+            ["The game version could not be read (sce_sys/param.json). Demon’s Souls PC needs version 01.005 or 01.007 of the game (01.007 recommended)."] =
+                "Impossible de lire la version du jeu (sce_sys/param.json). Demon’s Souls PC demande la version 01.005 ou 01.007 du jeu (01.007 conseillée).",
+            ["Game version {0} is not supported. Demon’s Souls PC needs version 01.005 or 01.007 of the game (01.007 recommended): update your dump with the 01.007 patch, then choose it again."] =
+                "La version {0} du jeu n’est pas prise en charge. Demon’s Souls PC demande la version 01.005 ou 01.007 du jeu (01.007 conseillée) : mets ton dump à jour avec le patch 01.007, puis choisis-le à nouveau.",
             ["Precompile failed (code {0}): see Logs\\precompile.log."] = "Échec de la précompilation (code {0}) : voir Logs\\precompile.log.",
         };
     }

@@ -10,11 +10,13 @@ using DemonsSoulsPC.App.Services;
 namespace DemonsSoulsPC.App.Views
 {
     // Shown by Play while the shaders were never precompiled for this engine and graphics driver
-    // (GameSetup.PrecompileNeeded): the quick precompile (-Quick: what play meets) with a progress bar, then the game. "Play now" stops it (what is
-    // done is kept, the next Play continues); closing the window stops it and starts nothing.
+    // (GameSetup.PrecompileNeeded): the full precompile with a progress bar, then the game. It is mandatory: there is no
+    // way to play before every shader and pipeline is compiled (0.2.0's "Play now" and quick run left players with
+    // freezes of up to 18 s). Closing the window stops it (what is done is kept, the next Play continues) and starts
+    // nothing; a failure offers to try again, never the game.
     public class ShaderPrepWindow : Window
     {
-        public enum Outcome { Done, PlayNow, Closed }
+        public enum Outcome { Done, Closed }
 
         private readonly string _root;
         private readonly string _dump;
@@ -50,11 +52,7 @@ namespace DemonsSoulsPC.App.Views
             panel.Children.Add(_status);
             _remaining = Text("", "MutedTextStyle", new Thickness(0, 4, 0, 0));
             panel.Children.Add(_remaining);
-            panel.Children.Add(Text(Loc.T("Prep.PlayNowHint"), "MutedTextStyle", new Thickness(0, 20, 0, 10)));
-            var playNow = new Button { Content = Loc.T("Prep.PlayNow"), HorizontalAlignment = HorizontalAlignment.Right, MinWidth = 180, Padding = new Thickness(16, 8, 16, 8) };
-            if (TryFindResource("SecondaryButtonStyle") is Style buttonStyle) playNow.Style = buttonStyle;
-            playNow.Click += (s, e) => { _outcome = Outcome.PlayNow; _stop.Cancel(); };
-            panel.Children.Add(playNow);
+            panel.Children.Add(Text(Loc.T("Prep.CloseHint"), "MutedTextStyle", new Thickness(0, 20, 0, 0)));
             Content = panel;
 
             Loaded += async (s, e) => await RunAsync();
@@ -72,22 +70,27 @@ namespace DemonsSoulsPC.App.Views
         {
             _clock.Start();
             var progress = new Progress<(int Percent, string Message)>(Report);
-            int code;
-            try { code = await GameSetup.PrecompileAsync(_root, _dump, progress, _stop.Token, quick: true); }
-            catch (Exception ex)
+            while (true)
             {
-                GameSetup.AppendLog(System.IO.Path.Combine(_root, "Logs", "precompile.log"), "launcher: " + ex + Environment.NewLine);
-                code = -1;
+                int code;
+                try { code = await GameSetup.PrecompileAsync(_root, _dump, progress, _stop.Token); }
+                catch (Exception ex)
+                {
+                    GameSetup.AppendLog(System.IO.Path.Combine(_root, "Logs", "precompile.log"), "launcher: " + ex + Environment.NewLine);
+                    code = -1;
+                }
+                if (_stop.IsCancellationRequested) break; // the window was closed: no game
+                if (code == 0) { _outcome = Outcome.Done; break; }
+                // A failure never starts the game: try again (it resumes where it stopped) or close.
+                var retry = MessageBox.Show(this, string.Format(Loc.T("Precompile failed (code {0}): see Logs\\precompile.log."), code) + "\n\n" + Loc.T("Prep.FailedRetry"),
+                    "Demon’s Souls PC", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.Yes);
+                if (retry != MessageBoxResult.Yes) break;
+                _bar.IsIndeterminate = true;
+                _status.Text = Loc.T("Prep.Starting");
+                _remaining.Text = "";
+                _firstPercent = -1;
             }
             _finished = true;
-            if (!_stop.IsCancellationRequested)
-            {
-                // A failure does not keep anyone from playing: the game starts, and the next Play tries again.
-                _outcome = Outcome.Done;
-                if (code != 0)
-                    MessageBox.Show(this, string.Format(Loc.T("Precompile failed (code {0}): see Logs\\precompile.log."), code) + "\n\n" + Loc.T("Prep.FailedPlay"),
-                        "Demon’s Souls PC", MessageBoxButton.OK, MessageBoxImage.Warning);
-            }
             Close();
         }
 
