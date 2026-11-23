@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -130,6 +130,9 @@ namespace DemonsSoulsPC.App
 
                 // Initialize settings
                 InitializeSettings();
+
+                // 0.2.3: every window of the launcher works with a controller (GamepadNavigator).
+                GamepadNavigator.Start();
                 LogDebug($"Settings loaded. FirstRunComplete: {_settings.FirstRunComplete}");
 
                 // A game already set up in Build\RunHybrid (for example by the old launcher) is used as it

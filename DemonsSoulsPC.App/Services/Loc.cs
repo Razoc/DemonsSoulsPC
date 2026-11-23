@@ -131,6 +131,7 @@ namespace DemonsSoulsPC.App.Services
             ["UI.DlssFg4"] = ("NVIDIA DLSS ×4 (RTX 50)", "NVIDIA DLSS 4x (RTX 50)"),
             ["UI.FgOffDs"] = ("Le jeu affiche ses propres images (60 par seconde).", "The game shows its own frames (60 per second)."),
             ["UI.FgDlssNote"] = ("NVIDIA DLSS : {0} images affichées par image du jeu, Reflex inclus. Un peu plus de latence ; les artefacts possibles touchent surtout l'interface. VSync indisponible : utilise G-Sync.", "NVIDIA DLSS: {0} frames shown per game frame, Reflex included. A little more latency; possible artifacts mostly on the HUD. No VSync: use G-Sync."),
+            ["UI.PadHints"] = ("Ⓐ/✕ Choisir   Ⓑ/○ Retour   Ⓧ/□ Info   LB/RB Pages   Menu/Options Jouer   Vue/Create Plein écran", "Ⓐ/✕ Select   Ⓑ/○ Back   Ⓧ/□ Info   LB/RB Pages   Menu/Options Play   View/Create Full screen"),
             ["UI.Goal"] = ("Objectif", "Goal"),
             ["Goal.Custom"] = ("Personnalisé", "Custom"),
             ["Goal.Smooth"] = ("Fluide (le plus de FPS)", "Smooth (most FPS)"),
