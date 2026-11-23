@@ -95,6 +95,7 @@ namespace DemonsSoulsPC.App.Services
             void Log(string line) => GameSetup.AppendLog(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] translation: {line}\r\n");
 
             Log(MemoryCheck.RemoveMemorySavings(Engine));
+            Log(EngineTitle.Apply(Engine));
             var psi = GameSetup.PowerShell(Path.Combine(Engine, GameSetup.RunScript), args, Engine);
             Log(psi.Arguments);
             string? stem = null;
@@ -203,6 +204,7 @@ namespace DemonsSoulsPC.App.Services
             // The engine's memory savings removed (MemoryCheck): patched before every start, in case the runtime was
             // installed or repaired since.
             var memory = MemoryCheck.RemoveMemorySavings(Engine);
+            memory += "\r\n" + EngineTitle.Apply(Engine); // the window's title: "Demon's Souls PC"
             try { memory += "\r\n" + await Task.Run(MemoryCheck.FreeUpForEngine); } catch { }
             try
             {
@@ -221,6 +223,7 @@ namespace DemonsSoulsPC.App.Services
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
             _ = Task.Run(() => SetEnginePriority(process, priority));
+            EngineTitle.WatchWindow(process);
 
             // WaitForExit() without a timeout also waits for the end of both outputs.
             await Task.Run(() => process.WaitForExit());

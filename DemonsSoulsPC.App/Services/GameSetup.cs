@@ -134,6 +134,7 @@ namespace DemonsSoulsPC.App.Services
             }
 
             Log(MemoryCheck.RemoveMemorySavings(_engine));
+            Log(EngineTitle.Apply(_engine));
 
             Report(20, Loc.T("Bringing your saves over..."));
             MigrateSaves(titleId, Log);
