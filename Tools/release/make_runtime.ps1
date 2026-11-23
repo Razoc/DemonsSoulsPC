@@ -64,10 +64,14 @@ KytyPS5, fork optimisé pour Demon's Souls par chenxiao07 : https://github.com/c
 Version : release $EngineTag, commit $EngineCommit
 Code source correspondant : https://github.com/chenxiao07/KytyPS5/tree/$EngineCommit
 Licence : GNU GPL v2 (LICENSE), composants tiers dans LICENSES.
-Le lanceur (DemonsSoulsPC.exe) démarre le moteur avec les réglages choisis. Une seule modification, faite par le lanceur
-sur le PC du joueur : le mode « économie de mémoire » du moteur est coupé (28 octets à l'offset 0x00f2906c de
-kyty_emulator.exe : « usable = min(total, available + own) » devient « usable = max(total, 16 Gio + 1 Mio) », voir
-DemonsSoulsPC.App\Services\MemoryCheck.cs dans https://github.com/Razoc/DemonsSoulsPC).
+Le lanceur (DemonsSoulsPC.exe) démarre le moteur avec les réglages choisis. Deux modifications, faites par le lanceur
+sur le PC du joueur (rien de modifié n'est distribué) :
+- le mode « économie de mémoire » du moteur est coupé (28 octets à l'offset 0x00f2906c de kyty_emulator.exe :
+  « usable = min(total, available + own) » devient « usable = max(total, 16 Gio + 1 Mio) », voir
+  DemonsSoulsPC.App\Services\MemoryCheck.cs dans https://github.com/Razoc/DemonsSoulsPC) ;
+- le titre de la fenêtre devient « Demon's Souls PC » : les chaînes de format de WindowContext::UpdateTitle
+  (src/graphics/presentation/window/window.cpp) sont réécrites à longueur égale, voir
+  DemonsSoulsPC.App\Services\EngineTitle.cs ; DSPC_TITLE_FPS=1 remet le titre d'origine.
 Génération d'images : streamline\ = runtime NVIDIA Streamline 2.14.16 (licences dans ce dossier) ;
 amd_fidelityfx_vk.dll = AMD FidelityFX SDK 1.1.4 (MIT, amd_fidelityfx-LICENSE.txt).
 "@ | Set-Content -Encoding UTF8 (Join-Path $dest 'SOURCE.txt')

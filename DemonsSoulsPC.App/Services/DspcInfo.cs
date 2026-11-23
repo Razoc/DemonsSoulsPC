@@ -20,8 +20,8 @@ namespace DemonsSoulsPC.App.Services
         // Demon’s Souls PC version can move the pin; installed copies then offer to update the runtime.
         public const string RuntimeVersion = "0.2.2";
         public const string RuntimeUrl = "https://github.com/" + Repo + "/releases/download/v0.2.2/DemonsSoulsPC-runtime-0.2.2.zip";
-        public const string RuntimeSha256 = "07f3a7937150d017aa2fc3457183b9c61847a2f04d17b9ecd064c108528596d1";
-        public const long RuntimeZipBytes = 55_058_441;
+        public const string RuntimeSha256 = "5afa5a966b9f69084c76198d86003f7e54dd1b55d2603d1d45bda1a07f25c449";
+        public const long RuntimeZipBytes = 55_058_607;
         public const long NeededBytes = 16L * 1024 * 1024 * 1024; // engine + shader caches (4.5-5.5 GB precompiled, 2 GB translated) + the precompile's ~12 GB at its end
         public const string RuntimeVersionFile = "dspc-runtime.txt";
 
