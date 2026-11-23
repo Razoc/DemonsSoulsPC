@@ -17,6 +17,36 @@ namespace DemonsSoulsPC.App.ViewModels
             _mainViewModel.PropertyChanged += (sender, e) => OnPropertyChanged(string.Empty);
         }
 
+        // Goal (0.2.2, as in Bloodborne PC): Custom / Smooth / Balanced / Quiet. The shown goal is the one the settings
+        // are now (Custom once one was changed by hand); picking one sets the Graphics page for this PC (GoalPlanner).
+        public string[] GoalLabels => new[] { Loc.T("Goal.Custom"), Loc.T("Goal.Smooth"), Loc.T("Goal.Balanced"), Loc.T("Goal.Quiet") };
+
+        public int GoalIndex
+        {
+            get => GoalPlanner.Current(_mainViewModel.Settings, _mainViewModel.HardwareInfo);
+            set
+            {
+                var pc = _mainViewModel.HardwareInfo;
+                if (pc == null || value < GoalPlanner.Smooth || value > GoalPlanner.Quiet || value == GoalIndex) return;
+                GoalPlanner.Apply(value, pc, _mainViewModel.Settings);
+                _mainViewModel.StatusMessage = Loc.T("Goal.Applied", GoalLabels[value]);
+                OnPropertyChanged(string.Empty);
+                _mainViewModel.OnPropertyChanged(nameof(MainWindowViewModel.Settings));
+            }
+        }
+
+        // Why each setting of the goal (the goal's row tooltip).
+        public string GoalNote
+        {
+            get
+            {
+                var pc = _mainViewModel.HardwareInfo;
+                int goal = GoalIndex;
+                if (pc == null || goal == GoalPlanner.Custom) return Loc.T("Goal.CustomNote");
+                return "• " + string.Join("\n• ", GoalPlanner.Make(goal, pc).Reasons);
+            }
+        }
+
         // Resolution
         // Indices 0..3 = 16:9, indices 4..5 = 21:9 ultrawide (#58)
         public string[] ResolutionLabels => new[] { "1280 x 720", "1600 x 900", "1920 x 1080", "2560 x 1440", "2560 x 1080 (21:9)", "3440 x 1440 (21:9)" };
@@ -68,7 +98,8 @@ namespace DemonsSoulsPC.App.ViewModels
                 // options off instead of leaving settings the launcher cannot honour.
                 if (!hardware.SupportsDlss && _mainViewModel.Settings.Upscale >= 1 && _mainViewModel.Settings.Upscale <= 5)
                     _mainViewModel.Settings.Upscale = 0;
-                if (!hardware.SupportsFrameGeneration && _mainViewModel.Settings.FrameGenMode >= 1 && _mainViewModel.Settings.FrameGenMode <= 4)
+                if (_mainViewModel.Settings.FrameGenMode >= 1 && _mainViewModel.Settings.FrameGenMode <= 3 &&
+                    (!hardware.SupportsFrameGeneration || _mainViewModel.Settings.FrameGenMode + 1 > hardware.SelectedGpu?.MaxFrameGenMultiplier))
                     _mainViewModel.Settings.FrameGenMode = 0;
 
                 OnPropertyChanged();
@@ -219,8 +250,17 @@ namespace DemonsSoulsPC.App.ViewModels
         }
 
         // Upscaling
+        // Demon's Souls PC 0.2.2: 0 the game's own (its TAA), 1-5 NVIDIA DLSS super resolution (RTX), 6 AMD FSR 3 (any card).
         public string[] UpscaleLabels => new[] { Loc.T("UI.UpscaleGame"), Loc.T("UI.DlssQuality"), Loc.T("UI.DlssBalanced"),
-                                                 Loc.T("UI.DlssPerformance"), Loc.T("UI.DlssUltra"), "DLAA", "AMD FSR 3.1" };
+                                                 Loc.T("UI.DlssPerformance"), Loc.T("UI.DlssUltra"), "NVIDIA DLAA", "AMD FSR 3" };
+
+        public string UpscaleNote => UpscaleIndex switch
+        {
+            0 => Loc.T("UI.UpscaleGameNote"),
+            6 => Loc.T("UI.UpscaleFsrNote"),
+            _ => Loc.T("UI.UpscaleDlssNote", new[] { "", "67 %", "58 %", "50 %", "33 %", "100 %" }[Math.Min(5, Math.Max(1, UpscaleIndex))])
+                 + (SupportsDlss ? "" : " " + Loc.T("UI.UpscaleDlssNotHere")),
+        };
 
         public int UpscaleIndex
         {
@@ -231,6 +271,7 @@ namespace DemonsSoulsPC.App.ViewModels
                 {
                     _mainViewModel.Settings.Upscale = value;
                     OnPropertyChanged();
+                    OnPropertyChanged(nameof(UpscaleNote));
                     OnPropertyChanged(nameof(IsFrameGenAvailable));
                     OnPropertyChanged(nameof(FrameGenNote));
                     _mainViewModel.OnPropertyChanged(nameof(MainWindowViewModel.Settings));
@@ -239,7 +280,10 @@ namespace DemonsSoulsPC.App.ViewModels
         }
 
         // Frame Generation
-        public string[] FrameGenLabels => new[] { Loc.T("Off (default)"), Loc.T("Auto - reach target (recommended)"), Loc.T("Fixed 2x"), Loc.T("Fixed 3x"), Loc.T("Fixed 4x"), Loc.T("UI.FsrFg") };
+        // Demon's Souls PC 0.2.2: the engine's own frame generation. 1-3 = NVIDIA DLSS frame generation with 1-3 generated
+        // frames (run-windows -FrameGen n, Streamline runtime in Build\Engine\streamline; RTX 40 for 2x, RTX 50 up to 4x),
+        // 4 = AMD FSR 3 frame generation (-Fsr, amd_fidelityfx_vk.dll next to the engine; any card).
+        public string[] FrameGenLabels => new[] { Loc.T("Off (default)"), Loc.T("UI.DlssFg2"), Loc.T("UI.DlssFg3"), Loc.T("UI.DlssFg4"), Loc.T("UI.FsrFg") };
 
         public int FrameGenIndex
         {
@@ -344,26 +388,17 @@ namespace DemonsSoulsPC.App.ViewModels
             get
             {
                 if (FrameGenIndex == 0)
-                    return Loc.T("UI.FgOff");
-
-                var targetValues = new[] { 0, 50, 60, 90, 120, 144, 165 };
-                int goal = FrameGenTargetIndex >= 0 && FrameGenTargetIndex < targetValues.Length ? targetValues[FrameGenTargetIndex] : 60;
-                int mult = FrameGenIndex == 1 ? 2 : FrameGenIndex;
-
-                if (FrameGenIndex == 1 && goal != 0)
-                {
-                    int limit = Math.Max(30, goal / 2);
-                    return Loc.T("UI.FgAuto", limit, goal);
-                }
-                else if (goal == 0)
-                {
-                    return Loc.T("UI.FgUnlocked", mult, 30 * mult);
-                }
-                else
-                {
-                    int limit = Math.Max(30, goal / mult);
-                    return Loc.T("UI.FgFixed", limit, mult, limit * mult);
-                }
+                    return Loc.T("UI.FgOffDs");
+                // The game's rate follows the screen (LauncherService.FrameGenGameRate): game rate x frames = shown.
+                int refresh = _mainViewModel.HardwareInfo?.RefreshRate ?? 60;
+                int mult = LauncherService.FrameGenFactor(FrameGenIndex);
+                int rate = LauncherService.FrameGenGameRate(FrameGenIndex, refresh);
+                if (rate == 0) rate = 60;
+                string pace = " " + Loc.T("UI.FgPace", rate, rate * mult, refresh);
+                if (FrameGenIndex == 4)
+                    return Loc.T("UI.FgFsrNote") + pace;
+                var max = _mainViewModel.HardwareInfo?.SelectedGpu?.MaxFrameGenMultiplier ?? 0;
+                return Loc.T("UI.FgDlssNote", mult) + pace + (max < mult ? " " + Loc.T("UI.FgDlssNotHere") : "");
             }
         }
 

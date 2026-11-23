@@ -282,6 +282,7 @@ namespace DemonsSoulsPC.App.Services
         private static string Machine()
         {
             var s = new StringBuilder();
+            try { s.AppendLine(MemoryCheck.Describe()); } catch { }
             try
             {
                 using (var os = new ManagementObjectSearcher("SELECT Caption, Version, TotalVisibleMemorySize FROM Win32_OperatingSystem"))

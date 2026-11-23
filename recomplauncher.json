@@ -13,7 +13,7 @@
     "args": ["--prepare", "{game}"],
     "label": "Demon's Souls PC engine (16 MB, KytyPS5 tuned for Demon's Souls)",
     "timeout": 1800,
-    "version": "0.2.0",
+    "version": "0.2.2",
     "done": ["{install}/Build/Engine/kyty_emulator.exe", "{install}/Build/Engine/dspc-game.json"]
   },
   "start": {

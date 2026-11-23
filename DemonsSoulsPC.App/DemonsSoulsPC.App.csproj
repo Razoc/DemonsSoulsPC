@@ -107,6 +107,8 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="Views\ShaderPrepWindow.cs" />
+    <Compile Include="Services\MemoryCheck.cs" />
+    <Compile Include="Services\GoalPlanner.cs" />
     <Compile Include="Services\SessionReport.cs" />
     <Compile Include="Models\AppSettings.cs" />
     <Compile Include="Models\GameInfo.cs" />

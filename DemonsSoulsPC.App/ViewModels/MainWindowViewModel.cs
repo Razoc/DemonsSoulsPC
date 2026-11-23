@@ -73,7 +73,7 @@ namespace DemonsSoulsPC.App.ViewModels
 
             NavigateCommand = new RelayCommand<LauncherPage>(page => CurrentPage = page);
             LaunchGameCommand = new RelayCommand(async () => await LaunchGameAsync(), () => !IsLaunching);
-            ApplyBestSettingsCommand = new RelayCommand(ApplyBestSettings);
+            ApplyBestSettingsCommand = new RelayCommand(() => ApplyBestSettings());
             RefreshControllersCommand = new RelayCommand(RefreshControllers);
             RepairInstallationCommand = new RelayCommand(async () => await RepairInstallationAsync());
             RebuildInstallationCommand = new RelayCommand(async () => await RebuildInstallationAsync());
@@ -209,7 +209,7 @@ namespace DemonsSoulsPC.App.ViewModels
                 if (Settings.ApplyBestOnStart && InstallationState?.IsInstalled == true)
                 {
                     Settings.ApplyBestOnStart = false;
-                    ApplyBestSettings();
+                    ApplyBestSettings(firstRun: true);
                 }
 
                 StatusMessage = InstallationState?.IsInstalled == true ? Loc.T("Ready") : Loc.T("Setup required");
@@ -305,21 +305,19 @@ namespace DemonsSoulsPC.App.ViewModels
             }
         }
 
-        private void ApplyBestSettings()
+        private void ApplyBestSettings(bool firstRun = false)
         {
             if (HardwareInfo == null) return;
 
             var best = PickBestSettings(HardwareInfo);
 
-            // Demon’s Souls PC: PS5 Performance mode rendering, 60 FPS limit, the largest 16:9 size that fits the
-            // screen; no DLSS, FSR or frame generation (not tested on this game yet).
-            Settings.Lighting = 0;
-            Settings.Fps = 1;
+            // Demon’s Souls PC 0.2.2: the largest 16:9 size that fits the screen, full screen, then a goal
+            // (GoalPlanner): the button takes the recommended one (Smooth where frame generation can fill a fast
+            // screen, else Balanced); a first start takes Balanced (no frame generation before the player asks).
             Settings.Size = best.Size;
             Settings.Fullscreen = true;
-            Settings.Upscale = 0;
-            Settings.FrameGenMode = 0;
-            Settings.LowLatency = false;
+            int goal = firstRun ? GoalPlanner.Balanced : GoalPlanner.Recommended(HardwareInfo);
+            GoalPlanner.Apply(goal, HardwareInfo, Settings);
             Settings.Controller = 0; // Auto
             Settings.RumblePercent = 70; // Medium
             Settings.Rumble = RumbleSetting.ToLegacyIndex(70);

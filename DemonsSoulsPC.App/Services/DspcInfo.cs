@@ -18,10 +18,10 @@ namespace DemonsSoulsPC.App.Services
         // The runtime (Build\Engine: the KytyPS5 engine tuned for Demon's Souls, chenxiao07/KytyPS5, GPL-2.0) is
         // Demon’s Souls PC's own package (Tools\release\make_runtime.ps1), pinned by version and SHA-256. A new
         // Demon’s Souls PC version can move the pin; installed copies then offer to update the runtime.
-        public const string RuntimeVersion = "0.2.0";
-        public const string RuntimeUrl = "https://github.com/" + Repo + "/releases/download/v0.2.0/DemonsSoulsPC-runtime-0.2.0.zip";
-        public const string RuntimeSha256 = "33b448d53dbe2a6f160fada4153b8bf7d384fc71d0057e38221f01fba0f6a0ce";
-        public const long RuntimeZipBytes = 16_020_989;
+        public const string RuntimeVersion = "0.2.2";
+        public const string RuntimeUrl = "https://github.com/" + Repo + "/releases/download/v0.2.2/DemonsSoulsPC-runtime-0.2.2.zip";
+        public const string RuntimeSha256 = "07f3a7937150d017aa2fc3457183b9c61847a2f04d17b9ecd064c108528596d1";
+        public const long RuntimeZipBytes = 55_058_441;
         public const long NeededBytes = 16L * 1024 * 1024 * 1024; // engine + shader caches (4.5-5.5 GB precompiled, 2 GB translated) + the precompile's ~12 GB at its end
         public const string RuntimeVersionFile = "dspc-runtime.txt";
 

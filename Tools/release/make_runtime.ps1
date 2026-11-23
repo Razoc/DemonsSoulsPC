@@ -10,7 +10,12 @@ param(
     [string]$Engine = 'F:\DemonsSoulsPC\KytyDS\v20261121\KytyPS5-v20261121.zip',
     [string]$EngineTag = 'v20261121',
     [string]$EngineCommit = '65433d2e',
-    [string]$Out = 'F:\DemonsSoulsPC\Release'
+    [string]$Out = 'F:\DemonsSoulsPC\Release',
+    # Génération d'images (0.2.2) : le runtime Streamline de NVIDIA (SDK 2.14.16, bin\x64) et le runtime FSR d'AMD
+    # (FidelityFX SDK 1.1.4, PrebuiltSignedDLL\amd_fidelityfx_vk.dll), signés par leurs éditeurs (le moteur vérifie la
+    # signature) ; leurs licences permettent de les livrer avec une application.
+    [string]$Streamline = 'F:\AkiBot\sdk\streamline-2.14.16',
+    [string]$FidelityFx = 'F:\AkiBot\sdk\fidelityfx-1.1.4'
 )
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -38,6 +43,19 @@ foreach ($f in 'kyty_emulator.exe', 'kyty_shader_precompile.exe', 'launch.json',
     if (-not (Test-Path (Join-Path $dest $f))) { throw "$f manquant dans la release du moteur" }
 }
 
+# 1 bis. Génération d'images : Streamline dans Build\Engine\streamline (où le moteur le cherche de lui-même) pour
+# DLSS Frame Generation (DLSS-G + Reflex) et DLSS super résolution (sl.dlss + nvngx_dlss, 0.2.2), et amd_fidelityfx_vk.dll à côté
+# du moteur pour FSR 3.
+$sl = Join-Path $dest 'streamline'
+New-Item -ItemType Directory -Force $sl | Out-Null
+foreach ($f in 'sl.interposer.dll', 'sl.common.dll', 'sl.dlss_g.dll', 'nvngx_dlssg.dll', 'sl.reflex.dll', 'sl.pcl.dll',
+    'NvLowLatencyVk.dll', 'sl.dlss.dll', 'nvngx_dlss.dll', 'nvngx_dlss.license.txt', 'reflex.license.txt') {
+    Copy-Item (Join-Path $Streamline "bin\x64\$f") $sl
+}
+Copy-Item (Join-Path $Streamline 'license.txt') (Join-Path $sl 'Streamline-license.txt')
+Copy-Item (Join-Path $FidelityFx 'PrebuiltSignedDLL\amd_fidelityfx_vk.dll') $dest
+Copy-Item (Join-Path $FidelityFx 'sdk\LICENSE.txt') (Join-Path $dest 'amd_fidelityfx-LICENSE.txt')
+
 # 2. Source du moteur (GPL-2.0 : le code source correspondant est publié par son auteur).
 @"
 Moteur de Demon's Souls PC
@@ -46,7 +64,12 @@ KytyPS5, fork optimisé pour Demon's Souls par chenxiao07 : https://github.com/c
 Version : release $EngineTag, commit $EngineCommit
 Code source correspondant : https://github.com/chenxiao07/KytyPS5/tree/$EngineCommit
 Licence : GNU GPL v2 (LICENSE), composants tiers dans LICENSES.
-Demon's Souls PC ne modifie pas ces fichiers : son lanceur (DemonsSoulsPC.exe) les démarre avec les réglages choisis.
+Le lanceur (DemonsSoulsPC.exe) démarre le moteur avec les réglages choisis. Une seule modification, faite par le lanceur
+sur le PC du joueur : le mode « économie de mémoire » du moteur est coupé (28 octets à l'offset 0x00f2906c de
+kyty_emulator.exe : « usable = min(total, available + own) » devient « usable = max(total, 16 Gio + 1 Mio) », voir
+DemonsSoulsPC.App\Services\MemoryCheck.cs dans https://github.com/Razoc/DemonsSoulsPC).
+Génération d'images : streamline\ = runtime NVIDIA Streamline 2.14.16 (licences dans ce dossier) ;
+amd_fidelityfx_vk.dll = AMD FidelityFX SDK 1.1.4 (MIT, amd_fidelityfx-LICENSE.txt).
 "@ | Set-Content -Encoding UTF8 (Join-Path $dest 'SOURCE.txt')
 "$EngineTag $EngineCommit" | Set-Content -Encoding ASCII (Join-Path $dest 'engine-version.txt')
 

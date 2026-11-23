@@ -46,6 +46,10 @@ namespace DemonsSoulsPC.App.Models
         [JsonPropertyName("lowlatency")]
         public bool LowLatency { get; set; } = false;
 
+        // 0.2.2: the goal last picked on the Graphics page (GoalPlanner: 0 custom, 1 smooth, 2 balanced, 3 quiet).
+        [JsonPropertyName("goal")]
+        public int Goal { get; set; } = 0;
+
         [JsonPropertyName("fgtarget")]
         public int FrameGenTarget { get; set; } = 2;
 

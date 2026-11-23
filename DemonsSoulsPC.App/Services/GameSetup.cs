@@ -133,6 +133,8 @@ namespace DemonsSoulsPC.App.Services
                 GameFeatures.EnsureSupportedVersion(dump);
             }
 
+            Log(MemoryCheck.RemoveMemorySavings(_engine));
+
             Report(20, Loc.T("Bringing your saves over..."));
             MigrateSaves(titleId, Log);
 

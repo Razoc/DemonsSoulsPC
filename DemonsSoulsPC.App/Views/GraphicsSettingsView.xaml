@@ -97,6 +97,18 @@
         <StackPanel Grid.Row="1" Grid.Column="2">
             <TextBlock Text="{svc:Tr 'UI.GroupRender'}" Style="{StaticResource GroupTitleStyle}"/>
 
+            <!-- Objectif (0.2.2, façon Bloodborne PC) : règle la page pour ce PC ; la bulle donne la raison de chaque réglage. -->
+            <Border Style="{StaticResource SettingRowStyle}" ToolTip="{Binding GoalNote}" BorderBrush="{StaticResource AccentBrush}">
+                <Grid>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{svc:Tr 'UI.Goal'}" Style="{StaticResource SettingLabelStyle}"/>
+                        <TextBlock Style="{StaticResource Info}"/>
+                    </StackPanel>
+                    <ComboBox ItemsSource="{Binding GoalLabels}" SelectedIndex="{Binding GoalIndex}"
+                              Style="{StaticResource ModernComboBoxStyle}" Width="264" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
+
             <Border Style="{StaticResource SettingRowStyle}" ToolTip="{Binding RayTracingNote}">
                 <Grid>
                     <StackPanel Orientation="Horizontal">
@@ -108,18 +120,21 @@
                 </Grid>
             </Border>
 
-            <Border Style="{StaticResource SettingRowStyle}" Visibility="Collapsed">
+            <Border Style="{StaticResource SettingRowStyle}" ToolTip="{Binding UpscaleNote}">
                 <Grid>
-                    <TextBlock Text="DLSS" Style="{StaticResource SettingLabelStyle}"/>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{svc:Tr 'UI.Upscaling'}" Style="{StaticResource SettingLabelStyle}"/>
+                        <TextBlock Style="{StaticResource Info}"/>
+                    </StackPanel>
                     <ComboBox ItemsSource="{Binding UpscaleLabels}" SelectedIndex="{Binding UpscaleIndex}"
                               Style="{StaticResource ModernComboBoxStyle}" Width="264" HorizontalAlignment="Right" VerticalAlignment="Center"/>
                 </Grid>
             </Border>
 
-            <Border Style="{StaticResource SettingRowStyle}" ToolTip="{Binding FrameGenNote}" Visibility="Collapsed">
+            <Border Style="{StaticResource SettingRowStyle}" ToolTip="{Binding FrameGenNote}">
                 <Grid>
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="Frame Generation" Style="{StaticResource SettingLabelStyle}"/>
+                        <TextBlock Text="{svc:Tr 'UI.FrameGen'}" Style="{StaticResource SettingLabelStyle}"/>
                         <TextBlock Style="{StaticResource Info}"/>
                     </StackPanel>
                     <ComboBox ItemsSource="{Binding FrameGenLabels}" SelectedIndex="{Binding FrameGenIndex}" IsEnabled="{Binding IsFrameGenAvailable}"

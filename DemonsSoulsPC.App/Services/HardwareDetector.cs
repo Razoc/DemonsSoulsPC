@@ -67,8 +67,19 @@ namespace DemonsSoulsPC.App.Services
             // Detect display settings
             try
             {
+                // The main monitor by its name (0.2.2): EnumDisplaySettings(null) failed on a PC whose main monitor
+                // hangs on another adapter than the NVIDIA card (165 Hz read as the 60 Hz fallback, so frame generation
+                // held the game at 30). The name first, null as before when it fails.
                 var dm = new DevMode { dmSize = (short)Marshal.SizeOf(typeof(DevMode)) };
-                if (EnumDisplaySettings(null, -1, ref dm) && dm.dmDisplayFrequency > 1)
+                string? primary = null;
+                try { primary = System.Windows.Forms.Screen.PrimaryScreen?.DeviceName; } catch { }
+                bool read = primary != null && EnumDisplaySettings(primary, -1, ref dm) && dm.dmDisplayFrequency > 1;
+                if (!read)
+                {
+                    dm = new DevMode { dmSize = (short)Marshal.SizeOf(typeof(DevMode)) };
+                    read = EnumDisplaySettings(null, -1, ref dm) && dm.dmDisplayFrequency > 1;
+                }
+                if (read)
                 {
                     info.RefreshRate = dm.dmDisplayFrequency;
                     info.ScreenWidth = dm.dmPelsWidth;

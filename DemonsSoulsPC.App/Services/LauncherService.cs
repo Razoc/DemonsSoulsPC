@@ -28,6 +28,12 @@ namespace DemonsSoulsPC.App.Services
         public async Task<int> LaunchGameAsync(AppSettings settings, HardwareInfo? hardware = null)
         {
             CheckEngine();
+            // --play (RecompLauncher, no window) has no hardware yet: the screen's refresh (frame generation's game rate)
+            // and the chosen card come from it, so it is detected here as the window does (0.2.2).
+            if (hardware == null)
+            {
+                try { hardware = new HardwareDetector().DetectHardware(); hardware.SelectGpu(settings.Gpu); } catch { }
+            }
             settings.LastLaunched = DateTime.Now;
             _settingsManager.Save(settings);
             return await StartAsync(BuildArguments(settings, hardware), settings.Priority, settings);
@@ -88,6 +94,7 @@ namespace DemonsSoulsPC.App.Services
             var logPath = Path.Combine(logs, "precompile.log");
             void Log(string line) => GameSetup.AppendLog(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] translation: {line}\r\n");
 
+            Log(MemoryCheck.RemoveMemorySavings(Engine));
             var psi = GameSetup.PowerShell(Path.Combine(Engine, GameSetup.RunScript), args, Engine);
             Log(psi.Arguments);
             string? stem = null;
@@ -193,10 +200,14 @@ namespace DemonsSoulsPC.App.Services
 
             var logs = Path.Combine(_rootDirectory, "Logs");
             Directory.CreateDirectory(logs);
+            // The engine's memory savings removed (MemoryCheck): patched before every start, in case the runtime was
+            // installed or repaired since.
+            var memory = MemoryCheck.RemoveMemorySavings(Engine);
+            try { memory += "\r\n" + await Task.Run(MemoryCheck.FreeUpForEngine); } catch { }
             try
             {
                 File.WriteAllText(Path.Combine(logs, "dspc-launch.log"),
-                    $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] engine {GameSetup.EngineVersion(_rootDirectory)}\r\n{psi.FileName} {psi.Arguments}\r\n");
+                    $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] engine {GameSetup.EngineVersion(_rootDirectory)}\r\n{memory}\r\n{psi.FileName} {psi.Arguments}\r\n");
             }
             catch { }
             // Logs\dspc-summary.log (what RecompLauncher's report needs in one file, also appended to the logs it may send)
@@ -257,11 +268,23 @@ namespace DemonsSoulsPC.App.Services
             if (settings.Fullscreen || Environment.GetEnvironmentVariable("RECOMPLAUNCHER_MODE") == "bigpicture")
                 args.Add("-Fullscreen");
 
-            // Frame rate: 0 = 30 (KYTY_FLIP_RATE=1, steady half rate), 1 = 60 (the game's own), 2 = up to 120.
-            if (settings.Fps == 0) sets.Add("KYTY_FLIP_RATE=1");
-            else if (settings.Fps == 2) args.Add("-Fps120");
+            // Frame generation (the Graphics page): 1-3 = NVIDIA DLSS with 1-3 generated frames (the Streamline runtime
+            // the runtime ships in Build\Engine\streamline, where the engine looks by itself), 4 = AMD FSR 3 2x
+            // (amd_fidelityfx_vk.dll next to the engine). The engine checks the card and driver and runs without it
+            // when they cannot. VSync is the frame generator's own business then.
+            bool frameGen = settings.FrameGenMode >= 1 && settings.FrameGenMode <= 4;
 
-            if (settings.VSync) args.AddRange(new[] { "-PresentMode", "Fifo" });
+            // Frame rate: 0 = 30 (KYTY_FLIP_RATE=1, steady half rate), 1 = 60 (the game's own), 2 = up to 120.
+            // With frame generation (0.2.2): the game's rate follows the screen instead (FrameGenGameRate), so the
+            // frames shown fill its refresh without going past it (165 Hz: x2 -> game up to 82, x3 -> 55, x4 -> 41).
+            int fgRate = frameGen ? FrameGenGameRate(settings.FrameGenMode, hardware?.RefreshRate ?? 60) : 0;
+            if (fgRate > 0) args.AddRange(new[] { "-Vblank", fgRate.ToString() });
+            else if (!frameGen && settings.Fps == 0) sets.Add("KYTY_FLIP_RATE=1");
+            else if (!frameGen && settings.Fps == 2) args.Add("-Fps120");
+            if (settings.FrameGenMode >= 1 && settings.FrameGenMode <= 3) args.AddRange(new[] { "-FrameGen", settings.FrameGenMode.ToString() });
+            else if (settings.FrameGenMode == 4) args.Add("-Fsr");
+
+            if (settings.VSync && !frameGen) args.AddRange(new[] { "-PresentMode", "Fifo" });
             if (settings.LowLatency) args.Add("-LowLatency");
 
             // Graphics: 0 standard (as on the PS5), 1 low, 2 lowest (shorter shadows and distant detail, smaller
@@ -269,8 +292,23 @@ namespace DemonsSoulsPC.App.Services
             if (settings.Lighting == 1) args.AddRange(new[] { "-Quality", "low", "-TextureReduce", "1" });
             else if (settings.Lighting == 2) args.AddRange(new[] { "-Quality", "lowest", "-TextureReduce", "2" });
 
-            // Upscaling: 6 = AMD FSR (built into the engine, any graphics card); the others stay the game's own.
-            if (settings.Upscale == 6) args.AddRange(new[] { "-Upscaler", "fsr", "-OutputHeight", Math.Max(1080, Math.Min(2159, sizeValues[size, 1])).ToString() });
+            // Upscaling, through Demon's Souls' own PS5 Pro path (src/loader/demonsSoulsSuperResolution.h): the upscaler in
+            // place of Sony's, its output at the window's height (-OutputHeight, 1080-2159: the default 3840x2160 output cost
+            // an RTX 5070 60 -> 43 FPS in DLSS Quality). 1-5 = NVIDIA DLSS (sl.dlss + nvngx_dlss in Build\Engine\streamline;
+            // RTX cards), whose mode the engine takes from the share of the output the 3D is rendered at
+            // (src/local/frame-gen.cpp: >= 0.95 DLAA, 0.62 Quality, 0.55 Balanced, 0.45 Performance, else Ultra
+            // Performance), so each mode is a render height: output x 2/3, 0.58, 1/2, 1/3, 1 (1440 output: 960, 835, 720,
+            // 480, 1440). Without DLSS on the card the engine falls back to FSR 3. 6 = AMD FSR 3 (built into the engine,
+            // any card) at the engine's own render height for that output.
+            int output = Math.Max(1080, Math.Min(2159, sizeValues[size, 1]));
+            if (settings.Upscale >= 1 && settings.Upscale <= 5)
+            {
+                var shares = new[] { 0.0, 2.0 / 3, 0.58, 0.5, 1.0 / 3, 1.0 };
+                int render = (int)Math.Round(output * shares[settings.Upscale]);
+                args.AddRange(new[] { "-Upscaler", "dlss", "-OutputHeight", output.ToString(), "-RenderHeight", render.ToString() });
+            }
+            else if (settings.Upscale == 6)
+                args.AddRange(new[] { "-Upscaler", "fsr", "-OutputHeight", output.ToString() });
 
             // Performance overlay (F8 in the game switches it): 1 frame rate, 2 detailed.
             if (settings.Overlay >= 1) sets.Add($"KYTY_FPS_HUD={Math.Min(settings.Overlay, 2)}");
@@ -292,6 +330,25 @@ namespace DemonsSoulsPC.App.Services
 
             if (sets.Count > 0) args.AddRange(new[] { "-Set", string.Join(",", sets) });
             return args;
+        }
+
+        // Frames shown per game frame for a frame generation mode (1-3 NVIDIA x2-x4, 4 AMD FSR 3 x2), 1 without.
+        public static int FrameGenFactor(int mode) => mode >= 1 && mode <= 3 ? mode + 1 : mode == 4 ? 2 : 1;
+
+        // The game's own rate (the engine's virtual vblank, -Vblank) with frame generation: the screen's refresh divided by
+        // the frames shown per game frame, so the generated frames fill the screen without going past its refresh
+        // (frames past it are thrown away or tear, with more latency). 30-120; 0 = the console's 60 (a 60 Hz rate, or a
+        // screen it cannot tell). Above 60 the engine's script keeps the game real time (gameMinDeltaTime=0.004); below,
+        // the game steps by its frame's own time. On a 9800X3D the game tops out near 70 by the processor anyway.
+        public static int FrameGenGameRate(int mode, int refreshHz)
+        {
+            int factor = FrameGenFactor(mode);
+            if (factor <= 1 || refreshHz < 50) return 0;
+            int rate = Math.Min(120, refreshHz / factor);
+            // Frame generation needs about 40-60 game frames a second (below, the latency and the artifacts show): a
+            // fast screen keeps at least 40; a 60 Hz one keeps the game's 60 (the generated frames gain nothing there).
+            if (rate < 40) rate = refreshHz >= 100 ? 40 : 60;
+            return rate == 60 ? 0 : rate;
         }
 
         // The engine selects a card by a part of its name (KYTY_GPU). The model token is used instead of the full
