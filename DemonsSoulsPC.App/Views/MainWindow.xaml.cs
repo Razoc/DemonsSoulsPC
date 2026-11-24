@@ -53,6 +53,14 @@ namespace DemonsSoulsPC.App.Views
         public void SetFullScreen(bool on)
         {
             IsFullScreen = on;
+            // Sharp when enlarged: text laid out on whole pixels ("Display") and rounded sizes are right at the page's own
+            // size only; scaled up they come out as blurred, blocky pixels. Full screen draws the text as shapes
+            // ("Ideal"), without rounding, and enlarges the pictures smoothly.
+            TextOptions.SetTextFormattingMode(this, on ? TextFormattingMode.Ideal : TextFormattingMode.Display);
+            TextOptions.SetTextRenderingMode(this, on ? TextRenderingMode.Grayscale : TextRenderingMode.Auto);
+            UseLayoutRounding = !on;
+            RenderOptions.SetBitmapScalingMode(this, BitmapScalingMode.HighQuality);
+            RenderOptions.SetClearTypeHint(this, ClearTypeHint.Enabled);
             if (on)
             {
                 SizeToContent = SizeToContent.Manual;

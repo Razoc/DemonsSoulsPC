@@ -32,6 +32,7 @@ namespace DemonsSoulsPC.App.Services
         static GamepadInput.Buttons _repeating;
         static ComboBox? _openList;
         static int _listIndex;
+        static int _listStart = -1;
         static ToolTip? _shownTip;
         static FocusFrame? _frame;
         static UIElement? _frameTarget;
@@ -79,7 +80,12 @@ namespace DemonsSoulsPC.App.Services
             else if ((state & _repeating) == 0) _repeating = GamepadInput.Buttons.None;
             if (pressed == GamepadInput.Buttons.None) return;
 
-            var window = HwndSource.FromHwnd(hwnd)?.RootVisual as Window;
+            // An open list draws its choices in a popup window of its own, which can be the one in front: the list's
+            // window then (0.2.3: without this, the controller went to the popup as keys and no choice could be made).
+            var root = HwndSource.FromHwnd(hwnd)?.RootVisual;
+            var window = root as Window;
+            if (window == null && _openList != null && _openList.IsDropDownOpen) window = Window.GetWindow(_openList);
+            if (window == null && root != null) window = Window.GetWindow(root) ?? Application.Current.Windows.OfType<Window>().FirstOrDefault(w => w.IsActive);
             if (window == null) { Keys(pressed); return; }   // a Windows dialog of ours
             SetPadMode(true);
             try { Handle(window, pressed); } catch { }
@@ -106,7 +112,9 @@ namespace DemonsSoulsPC.App.Services
                 }
                 else if (Has(pressed, GamepadInput.Buttons.B))
                 {
+                    // Back to the choice it had when it opened.
                     var list = _openList; _openList = null;
+                    if (_listStart >= 0 && _listStart < count) list.SelectedIndex = _listStart;
                     list.IsDropDownOpen = false; list.Focus();
                 }
                 return;
@@ -169,9 +177,15 @@ namespace DemonsSoulsPC.App.Services
             {
                 case ComboBox list when list.IsEnabled:
                     _openList = list;
+                    _listStart = list.SelectedIndex;
                     _listIndex = Math.Max(0, list.SelectedIndex);
                     list.IsDropDownOpen = true;
                     list.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => MoveInList(0)));
+                    break;
+                case ComboBoxItem item when ItemsControl.ItemsControlFromItemContainer(item) is ComboBox owner:
+                    // The focus already in an open list (opened by the mouse): take that choice.
+                    owner.SelectedItem = owner.ItemContainerGenerator.ItemFromContainer(item);
+                    owner.IsDropDownOpen = false; owner.Focus();
                     break;
                 case ButtonBase button when button.IsEnabled:
                     Click(button);
@@ -188,11 +202,11 @@ namespace DemonsSoulsPC.App.Services
             int count = _openList.Items.Count;
             if (count == 0) return;
             _listIndex = Math.Max(0, Math.Min(count - 1, _listIndex + step));
+            // The choice is shown chosen as you move (the list itself and the box), the focus stays on the list's box:
+            // B puts the first one back. Moving the keyboard focus into the popup lost the controller.
+            _openList.SelectedIndex = _listIndex;
             if (_openList.ItemContainerGenerator.ContainerFromIndex(_listIndex) is ComboBoxItem item)
-            {
-                item.Focus();
                 item.BringIntoView();
-            }
         }
 
         // A click as the mouse makes it: Click event, command, a switch toggled, a page chosen.
