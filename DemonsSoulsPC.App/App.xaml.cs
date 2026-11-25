@@ -33,6 +33,9 @@ namespace DemonsSoulsPC.App
             };
         }
 
+        // Started by RecompLauncher's Play with --launcher (see OnStartup).
+        public static bool FromRecompLauncher { get; private set; }
+
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
@@ -43,7 +46,11 @@ namespace DemonsSoulsPC.App
 
             // Set up global exception handling. Started with arguments (--prepare, --play... from RecompLauncher or a
             // script) there is no window and nobody to close a message box: log the error and exit.
-            bool headless = e.Args.Length > 0;
+            // DemonsSoulsPC.exe --launcher: RecompLauncher's Play (recomplauncher.json "start"). The launcher opens as
+            // usual (full screen unless the player chose a window); its Play hides it, and when the game ends the
+            // launcher closes with the game's exit code, so RecompLauncher sees crashes as with --play.
+            FromRecompLauncher = e.Args.Length == 1 && e.Args[0] == "--launcher";
+            bool headless = e.Args.Length > 0 && !FromRecompLauncher;
             AppDomain.CurrentDomain.UnhandledException += (sender, args) =>
             {
                 var ex = args.ExceptionObject as Exception;

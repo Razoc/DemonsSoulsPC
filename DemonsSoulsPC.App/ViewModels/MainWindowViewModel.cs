@@ -271,6 +271,12 @@ namespace DemonsSoulsPC.App.ViewModels
             }
             StatusMessage = Loc.T("Launching Demon’s Souls...");
 
+            // Opened by RecompLauncher (--launcher): the launcher steps aside while the game runs, then hands the game's
+            // exit code back to RecompLauncher by closing.
+            var window = Application.Current?.MainWindow;
+            bool fromRecomp = DemonsSoulsPC.App.App.FromRecompLauncher;
+            if (fromRecomp) window?.Hide();
+
             try
             {
                 // Determine which launcher to use based on settings
@@ -288,6 +294,12 @@ namespace DemonsSoulsPC.App.ViewModels
                     exitCode = await _launcherService.LaunchGameAsync(Settings, HardwareInfo);
                 }
 
+                if (fromRecomp)
+                {
+                    Application.Current?.Shutdown(exitCode);
+                    return;
+                }
+
                 StatusMessage = exitCode == 0 ? Loc.T("Game exited normally") : Loc.T("Game exited with code {0}", exitCode);
 
                 // The in-game menu may have changed the settings file: take its values back.
@@ -297,6 +309,7 @@ namespace DemonsSoulsPC.App.ViewModels
             catch (Exception ex)
             {
                 StatusMessage = $"Launch error: {ex.Message}";
+                if (fromRecomp) window?.Show();
                 MessageBox.Show($"Failed to launch game:\n{ex.Message}", "Demon’s Souls PC", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally

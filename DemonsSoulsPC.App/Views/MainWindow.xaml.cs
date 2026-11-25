@@ -29,9 +29,12 @@ namespace DemonsSoulsPC.App.Views
             // The place is set before the window shows (a full-screen window fills the monitor it is on), full screen once
             // it is there.
             PlaceOnChosenScreen();
+            // The player's choice is kept (launcherWindowed in dspc-settings.json); full screen by default.
             Loaded += (_, __) =>
             {
-                if (Environment.GetEnvironmentVariable("DSPC_LAUNCHER_WINDOWED") != "1") SetFullScreen(true);
+                bool windowed = Environment.GetEnvironmentVariable("DSPC_LAUNCHER_WINDOWED") == "1"
+                                || Vm?.Settings?.LauncherWindowed == true;
+                SetFullScreen(!windowed);
             };
             PreviewKeyDown += (_, e) =>
             {
@@ -48,11 +51,26 @@ namespace DemonsSoulsPC.App.Views
 
         public bool IsFullScreen { get; private set; }
 
-        public void ToggleFullScreen() => SetFullScreen(!IsFullScreen);
+        // The player's switch (top-right button, F11, Alt+Enter, View / Create): also remembered for the next start.
+        public void ToggleFullScreen()
+        {
+            SetFullScreen(!IsFullScreen);
+            var vm = Vm;
+            if (vm?.Settings != null && vm.Settings.LauncherWindowed == IsFullScreen)
+            {
+                vm.Settings.LauncherWindowed = !IsFullScreen;
+                vm.OnPropertyChanged(nameof(MainWindowViewModel.Settings)); // saves dspc-settings.json
+            }
+        }
+
+        void ScreenButton_Click(object sender, RoutedEventArgs e) => ToggleFullScreen();
 
         public void SetFullScreen(bool on)
         {
             IsFullScreen = on;
+            // Top-right button: "leave full screen" in full screen, "full screen" in a window.
+            ScreenButtonIcon.Text = on ? "" : "";
+            ScreenButton.ToolTip = Services.Loc.T(on ? "UI.LeaveFullScreen" : "UI.FullScreen");
             // Sharp when enlarged: text laid out on whole pixels ("Display") and rounded sizes are right at the page's own
             // size only; scaled up they come out as blurred, blocky pixels. Full screen draws the text as shapes
             // ("Ideal"), without rounding, and enlarges the pictures smoothly.
@@ -102,6 +120,10 @@ namespace DemonsSoulsPC.App.Views
         }
 
         MainWindowViewModel? Vm => DataContext as MainWindowViewModel;
+
+        // Quitter (button, or Y / Triangle): closes the launcher as its window's close button does.
+        void QuitButton_Click(object sender, RoutedEventArgs e) => Quit();
+        public void Quit() => Close();
 
         // Start / Options: Play, as the button.
         public void Play()

@@ -18,7 +18,7 @@
   },
   "start": {
     "program": ["DemonsSoulsPC.exe"],
-    "args": ["--play"]
+    "args": ["--launcher"]
   },
   "exit_codes": {
     "0": "ok",

@@ -133,6 +133,11 @@ namespace DemonsSoulsPC.App.Models
         [JsonPropertyName("applyBestOnStart")]
         public bool ApplyBestOnStart { get; set; } = false;
 
+        // 0.2.3: the launcher opens in a window instead of full screen (the player's last choice: the top-right
+        // button, F11, Alt+Enter or the controller's View / Create button).
+        [JsonPropertyName("launcherWindowed")]
+        public bool LauncherWindowed { get; set; } = false;
+
         [JsonPropertyName("firstRunComplete")]
         public bool FirstRunComplete { get; set; } = false;
 

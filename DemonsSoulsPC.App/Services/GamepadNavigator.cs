@@ -22,6 +22,7 @@ namespace DemonsSoulsPC.App.Services
     //   Start / Options      Play
     //   View / Create        full screen <-> window
     //   X / Square           shows the ⓘ explanation of the setting
+    //   Y / Triangle         quits the launcher
     // Windows' own dialogs (message boxes, the folder picker) get keys instead: arrows, Enter, Escape, Tab.
     // Nothing happens while another program is in front (the game itself reads the controller then).
     public static class GamepadNavigator
@@ -125,6 +126,7 @@ namespace DemonsSoulsPC.App.Services
 
             if (Has(pressed, GamepadInput.Buttons.Back) && main != null) { main.ToggleFullScreen(); return; }
             if (Has(pressed, GamepadInput.Buttons.Start) && main != null) { main.Play(); return; }
+            if (Has(pressed, GamepadInput.Buttons.Y) && main != null) { main.Quit(); return; }
             if ((Has(pressed, GamepadInput.Buttons.LB) || Has(pressed, GamepadInput.Buttons.RB)) && main != null)
             {
                 CloseTip();
