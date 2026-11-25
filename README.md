@@ -6,7 +6,7 @@ Depuis la 0.2, le jeu tourne sur **KytyPS5 optimisé pour Demon's Souls** (le fo
 
 > Aucun fichier du jeu n'est fourni. Il te faut un dump PS5 déchiffré de Demon's Souls que tu as obtenu légalement.
 
-## État (version 0.2.2)
+## État (version 0.2.3)
 
 - **Moteur** : KytyPS5 de chenxiao07. Le jeu n'est pas converti : le moteur lit ton dump tel quel, sans le
   modifier. Testé : écran titre, « Continuer » avec une sauvegarde, partie en jeu.
@@ -21,6 +21,8 @@ Depuis la 0.2, le jeu tourne sur **KytyPS5 optimisé pour Demon's Souls** (le fo
   soit ~150-160 images affichées.
 - **Mise à l'échelle** (0.2.2) : NVIDIA DLSS (Qualité à Ultra Performance) et DLAA, AMD FSR 3.
 - **Objectifs** (0.2.2) : Fluide, Équilibré ou Silencieux, réglés selon ton PC avec la raison de chaque réglage.
+- **Lanceur en plein écran et 100 % manette** (0.2.3) : s'ouvre en plein écran (ou en fenêtre si tu le choisis), se
+  pilote entièrement à la manette (Xbox, DualSense, DualShock 4…) ; c'est lui qui s'ouvre au **Jouer** de RecompLauncher.
 - Pas encore : mode en ligne.
 
 ## Premier lancement : préparation des shaders (obligatoire)
@@ -53,15 +55,28 @@ zone ou un effet apparaît : c'était la cause des saccades signalées en 0.2.0.
 Windows SmartScreen peut avertir au premier lancement (exe non signé) : « Informations complémentaires » puis
 « Exécuter quand même ».
 
+### Plein écran et manette (0.2.3)
+
+- Le lanceur s'ouvre **en plein écran**. Le bouton en haut à droite (ou **F11**, **Alt+Entrée**, le bouton
+  **Vue / Create** de la manette) passe en fenêtre ; ce choix est gardé pour les fois suivantes.
+- **À la manette** : croix ou stick gauche = se déplacer, **A / ×** = choisir (ouvre aussi les listes), **B / ○** =
+  retour, **X / □** = info ⓘ du réglage, **LB / RB** = page précédente / suivante, **Start / Options** = Jouer,
+  **Y / △** = Quitter. Un cadre doré montre le réglage choisi et un bandeau rappelle les boutons.
+- Manettes Xbox (et compatibles XInput : SCUF, 8BitDo…), DualSense et DualShock 4 (USB et Bluetooth), lues seulement
+  quand le lanceur est au premier plan et sans jamais rien leur envoyer.
+
 ### Avec RecompLauncher
 
 Le dépôt contient un `recomplauncher.json` : RecompLauncher installe le zip `DemonsSoulsPC-v<version>-Windows-x64.zip`,
-lance `DemonsSoulsPC.exe --prepare "<dump>"` (runtime + mise en place, lignes `progress`), puis
-`DemonsSoulsPC.exe --play` (qui ouvre la préparation des shaders au premier lancement). Un dump dans une autre
-version que 01.007 ou 01.005 est refusé avec un message.
+lance `DemonsSoulsPC.exe --prepare "<dump>"` (runtime + mise en place, lignes `progress`). Son bouton **Jouer**
+lance `DemonsSoulsPC.exe --launcher` (0.2.3) : le lanceur s'ouvre en plein écran (ou en fenêtre si tu l'as choisi),
+tu règles ce que tu veux puis **Jouer** ; il se cache pendant la partie et se ferme avec le jeu, en rendant à
+RecompLauncher le code de fin du jeu (ses messages en cas de plantage restent valables). La préparation des shaders
+s'ouvre au premier lancement. Un dump dans une autre version que 01.007 ou 01.005 est refusé avec un message.
 
 ### Mise à jour
 
+- **Depuis la 0.2.2** : automatique ; seul le lanceur change (même runtime, pas de nouvelle préparation des shaders).
 - **Depuis la 0.2.0 / 0.2.1** : automatique ; le lanceur télécharge le runtime 0.2.2 (DLSS, génération d'images).
   Tes sauvegardes, réglages et caches de shaders sont gardés.
 - **Depuis la 0.1** : automatique ; tes sauvegardes sont reprises (copie de secours dans `Build\saves-0.1`), l'ancien
@@ -98,6 +113,7 @@ Sauvegardes : `Build\Engine\_SaveData`. Réglages : `Build\dspc-settings.json`.
 | Commande | Rôle |
 |---|---|
 | `DemonsSoulsPC.exe --prepare "<dump>"` | installe ou met à jour le runtime à côté de l'exe, puis met le jeu en place (sans fenêtre) |
+| `DemonsSoulsPC.exe --launcher` | ouvre le lanceur (bouton Jouer de RecompLauncher) ; après la partie, il se ferme avec le code de fin du jeu |
 | `DemonsSoulsPC.exe --play` | lance le jeu avec les réglages enregistrés (préparation des shaders d'abord si besoin) |
 | `DemonsSoulsPC.exe --precompile` | préparation complète des shaders (pipelines puis traduction), sans fenêtre (lignes `progress`) |
 | `DemonsSoulsPC.exe --translate` | seulement la traduction des shaders par le moteur (caché), code 0 une fois faite |
@@ -122,7 +138,7 @@ Le nom d'utilisateur Windows est masqué dans le résumé. Les journaux complets
   `65433d2e`, sans ses scripts .cmd ni son lanceur ; ajoute `SOURCE.txt`, `engine-version.txt`, NVIDIA Streamline
   2.14.16 avec DLSS / DLSS-G / Reflex (`-Streamline`) et `amd_fidelityfx_vk.dll` du FidelityFX SDK 1.1.4
   (`-FidelityFx`)).
-- Zip RecompLauncher : `Tools\release\make_launcher_zip.ps1 -Version 0.2.2`.
+- Zip RecompLauncher : `Tools\release\make_launcher_zip.ps1 -Version 0.2.3`.
 - Icône (originale, aucune image du jeu) : `Tools\release\make_icon.ps1`.
 
 ## Crédits et licences
