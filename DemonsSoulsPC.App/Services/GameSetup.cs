@@ -296,9 +296,28 @@ namespace DemonsSoulsPC.App.Services
         public static async Task<int> PrecompileAsync(string root, string dump, IProgress<(int Percent, string Message)>? progress,
             System.Threading.CancellationToken cancel = default)
         {
-            var engine = EngineDirectory(root);
             var logs = Path.Combine(root, "Logs");
             Directory.CreateDirectory(logs);
+            // One precompile per install at a time (0.2.5, a player's "code -1"): a launcher that updates itself while
+            // preparing starts its new exe, which prepared again while the old run was still being stopped. The lock file
+            // goes with its process, even a killed one; a new launcher waits up to 20 s for the old one to leave.
+            FileStream? held = null;
+            for (int attempt = 0; attempt < 40 && held == null; attempt++)
+            {
+                try { held = new FileStream(Path.Combine(logs, "precompile.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, 1, FileOptions.DeleteOnClose); }
+                catch (IOException) { await Task.Delay(500); }
+            }
+            if (held == null) return AlreadyRunning;
+            using (held) return await PrecompileHeldAsync(root, dump, logs, progress, cancel);
+        }
+
+        // PrecompileAsync's code when another launcher is preparing the same install.
+        public const int AlreadyRunning = 91;
+
+        private static async Task<int> PrecompileHeldAsync(string root, string dump, string logs, IProgress<(int Percent, string Message)>? progress,
+            System.Threading.CancellationToken cancel)
+        {
+            var engine = EngineDirectory(root);
             // Always the full run: every shader and pipeline of the game. (0.2.0's -Quick left about a quarter of the
             // pipelines play met, compiled in play with freezes of up to 18 s in players' reports.)
             var arguments = new List<string> { "-Game", dump };

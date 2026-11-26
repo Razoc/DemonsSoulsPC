@@ -30,7 +30,7 @@ namespace DemonsSoulsPC.App.Views
         private Outcome _outcome = Outcome.Closed;
         private bool _finished;
 
-        private ShaderPrepWindow(string root, string dump)
+        private ShaderPrepWindow(string root, string dump, bool thenPlay)
         {
             _root = root;
             _dump = dump;
@@ -47,7 +47,8 @@ namespace DemonsSoulsPC.App.Views
             // throws them all away, as in every PC game).
             var driver = GameSetup.DriverChange(root);
             panel.Children.Add(Text(driver == null ? Loc.T("Prep.Heading") : Loc.T("Prep.DriverHeading"), "TitleTextStyle", new Thickness(0, 0, 0, 12)));
-            panel.Children.Add(Text(driver == null ? Loc.T("Prep.Intro") : string.Format(Loc.T("Prep.DriverIntro"), driver.Value.Old, driver.Value.New),
+            panel.Children.Add(Text(!thenPlay ? Loc.T("Prep.RebuildIntro")
+                : driver == null ? Loc.T("Prep.Intro") : string.Format(Loc.T("Prep.DriverIntro"), driver.Value.Old, driver.Value.New),
                 "BodyTextStyle", new Thickness(0, 0, 0, 20)));
             _bar = new ProgressBar { Height = 14, Minimum = 0, Maximum = 100, IsIndeterminate = true };
             if (TryFindResource("ModernProgressBarStyle") is Style barStyle) _bar.Style = barStyle;
@@ -77,16 +78,23 @@ namespace DemonsSoulsPC.App.Views
             while (true)
             {
                 int code;
+                string error = "";
                 try { code = await GameSetup.PrecompileAsync(_root, _dump, progress, _stop.Token); }
                 catch (Exception ex)
                 {
                     GameSetup.AppendLog(System.IO.Path.Combine(_root, "Logs", "precompile.log"), "launcher: " + ex + Environment.NewLine);
                     code = -1;
+                    error = "\n" + ex.Message; // the log may be the very file that could not be opened
                 }
                 if (_stop.IsCancellationRequested) break; // the window was closed: no game
                 if (code == 0) { _outcome = Outcome.Done; break; }
+                if (code == GameSetup.AlreadyRunning)
+                {
+                    MessageBox.Show(this, Loc.T("Prep.AlreadyRunning"), "Demon’s Souls PC", MessageBoxButton.OK, MessageBoxImage.Information);
+                    break;
+                }
                 // A failure never starts the game: try again (it resumes where it stopped) or close.
-                var retry = MessageBox.Show(this, string.Format(Loc.T("Precompile failed (code {0}): see Logs\\precompile.log."), code) + "\n\n" + Loc.T("Prep.FailedRetry"),
+                var retry = MessageBox.Show(this, string.Format(Loc.T("Precompile failed (code {0}): see Logs\\precompile.log."), code) + error + "\n\n" + Loc.T("Prep.FailedRetry"),
                     "Demon’s Souls PC", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.Yes);
                 if (retry != MessageBoxResult.Yes) break;
                 _bar.IsIndeterminate = true;
@@ -118,10 +126,14 @@ namespace DemonsSoulsPC.App.Views
         {
             if (string.IsNullOrEmpty(dump) || !System.IO.File.Exists(System.IO.Path.Combine(dump, "eboot.bin"))) return true;
             if (!GameSetup.PrecompileNeeded(root)) return true;
-            var window = new ShaderPrepWindow(root, dump!);
+            var window = new ShaderPrepWindow(root, dump!, thenPlay: true);
             if (owner != null && owner.IsVisible) window.Owner = owner;
             window.ShowDialog();
             return window._outcome != Outcome.Closed;
         }
+
+        // The launcher's "Precompile the shaders" button (0.2.5): the same window on its own, whatever is done already
+        // (the run keeps what is there and completes the rest); nothing starts after it.
+        public static void PrepareNow(string root, string dump) => new ShaderPrepWindow(root, dump, thenPlay: false).ShowDialog();
     }
 }

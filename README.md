@@ -6,7 +6,7 @@ Depuis la 0.2, le jeu tourne sur **KytyPS5 optimisé pour Demon's Souls** (le fo
 
 > Aucun fichier du jeu n'est fourni. Il te faut un dump PS5 déchiffré de Demon's Souls que tu as obtenu légalement.
 
-## État (version 0.2.5)
+## État (version 0.2.6)
 
 - **Moteur** : KytyPS5 de chenxiao07. Le jeu n'est pas converti : le moteur lit ton dump tel quel, sans le
   modifier. Testé : écran titre, « Continuer » avec une sauvegarde, partie en jeu.
@@ -29,6 +29,9 @@ Depuis la 0.2, le jeu tourne sur **KytyPS5 optimisé pour Demon's Souls** (le fo
 - **Corrigé en 0.2.5** : 8 antivirus sur 70 (moteur BitDefender) signalaient le lanceur depuis la 0.2.2 sur
   VirusTotal, à tort. En cause : les bibliothèques intégrées à l'exe et chargées en mémoire. Le lanceur n'en a plus
   besoin (0/70 sur VirusTotal) ; il ne fait plus que 450 Ko.
+- **0.2.6** : la préparation des shaders ne peut plus tourner deux fois en même temps (un lanceur mis à jour pendant
+  la préparation en relançait une seconde : « Échec de la précompilation (code -1) »). Le bouton **Précompiler les
+  shaders** (page Installation) ferme le lanceur et ouvre directement la fenêtre de préparation.
 - Pas encore : mode en ligne.
 
 ## Premier lancement : préparation des shaders (obligatoire)
@@ -82,7 +85,7 @@ s'ouvre au premier lancement. Un dump dans une autre version que 01.007 ou 01.00
 
 ### Mise à jour
 
-- **Depuis la 0.2.2 / 0.2.3 / 0.2.4** : automatique ; seul le lanceur change (même runtime, pas de nouvelle préparation des shaders).
+- **Depuis la 0.2.2 à 0.2.5** : automatique ; seul le lanceur change (même runtime, pas de nouvelle préparation des shaders).
 - **Depuis la 0.2.0 / 0.2.1** : automatique ; le lanceur télécharge le runtime 0.2.2 (DLSS, génération d'images).
   Tes sauvegardes, réglages et caches de shaders sont gardés.
 - **Depuis la 0.1** : automatique ; tes sauvegardes sont reprises (copie de secours dans `Build\saves-0.1`), l'ancien
@@ -144,7 +147,7 @@ Le nom d'utilisateur Windows est masqué dans le résumé. Les journaux complets
   `65433d2e`, sans ses scripts .cmd ni son lanceur ; ajoute `SOURCE.txt`, `engine-version.txt`, NVIDIA Streamline
   2.14.16 avec DLSS / DLSS-G / Reflex (`-Streamline`) et `amd_fidelityfx_vk.dll` du FidelityFX SDK 1.1.4
   (`-FidelityFx`)).
-- Zip RecompLauncher : `Tools\release\make_launcher_zip.ps1 -Version 0.2.5`.
+- Zip RecompLauncher : `Tools\release\make_launcher_zip.ps1 -Version 0.2.6`.
 - Icône (originale, aucune image du jeu) : `Tools\release\make_icon.ps1`.
 
 ## Crédits et licences

@@ -56,44 +56,20 @@ namespace DemonsSoulsPC.App.ViewModels
         public ICommand UninstallCommand { get; }
         public ICommand RunSetupAgainCommand { get; }
 
-        private bool _precompiling;
-        private System.Threading.CancellationTokenSource? _precompileStop;
-
-        // The full shader precompile (about an hour, the CPU fully loaded): asked first; pressing the button again
-        // stops it (what is done is kept, the next run continues).
-        private async void Precompile()
+        // The full shader precompile (about an hour, the CPU fully loaded), asked by the player (0.2.5): the launcher
+        // closes and only the preparation window stays, as before the first Play; closing it stops the run (what is
+        // done is kept, the next run continues).
+        private void Precompile()
         {
-            if (_precompiling)
-            {
-                _precompileStop?.Cancel();
-                return;
-            }
             var dump = _mainViewModel.Settings.GameDumpPath;
             if (string.IsNullOrEmpty(dump) || !System.IO.File.Exists(System.IO.Path.Combine(dump, "eboot.bin")))
             {
                 MessageBox.Show(Loc.T("The game folder (with eboot.bin) was not found: choose it again in the settings."), "Demon’s Souls PC");
                 return;
             }
-            if (MessageBox.Show(Loc.T("UI.PrecompileAsk"), "Demon’s Souls PC", MessageBoxButton.YesNo, MessageBoxImage.Information) != MessageBoxResult.Yes)
-                return;
-            _precompiling = true;
-            _precompileStop = new System.Threading.CancellationTokenSource();
-            _mainViewModel.StatusMessage = Loc.T("Precompiling shaders...");
-            try
-            {
-                var progress = new Progress<(int Percent, string Message)>(p => _mainViewModel.StatusMessage = p.Percent >= 0 ? $"{p.Message} ({p.Percent} %)" : p.Message);
-                var code = await GameSetup.PrecompileAsync(_mainViewModel.RootDirectory, dump!, progress, _precompileStop.Token);
-                _mainViewModel.StatusMessage = _precompileStop.IsCancellationRequested ? Loc.T("Precompile stopped: the next run continues.")
-                    : code == 0 ? Loc.T("Shaders precompiled.") : string.Format(Loc.T("Precompile failed (code {0}): see Logs\\precompile.log."), code);
-            }
-            catch (Exception ex)
-            {
-                _mainViewModel.StatusMessage = ex.Message;
-            }
-            finally
-            {
-                _precompiling = false;
-            }
+            Application.Current.MainWindow?.Hide();
+            Views.ShaderPrepWindow.PrepareNow(_mainViewModel.RootDirectory, dump!);
+            Application.Current.Shutdown(0);
         }
 
         private void RunSetupAgain()
