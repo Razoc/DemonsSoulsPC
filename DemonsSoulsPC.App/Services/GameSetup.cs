@@ -244,6 +244,41 @@ namespace DemonsSoulsPC.App.Services
             catch { return false; }
         }
 
+        // Why the shaders are prepared again: the graphics driver changed since the last full run (same engine, same
+        // "full+translation" kind of run) → (old, new) as NVIDIA numbers them (621.24), else null (first time, new engine).
+        public static (string Old, string New)? DriverChange(string root)
+        {
+            try
+            {
+                var marker = PrecompileMarkerPath(root);
+                if (!File.Exists(marker)) return null;
+                var saved = File.ReadAllText(marker).Trim().Split('|');
+                var now = PrecompileKey(root).Split('|');
+                if (saved.Length != 3 || now.Length != 3) return null;
+                if (saved[0].Trim() != now[0].Trim() || saved[2].Trim() != now[2].Trim() || saved[1].Trim() == now[1].Trim()) return null;
+                // Several cards ("AMD ... ; Intel ..."): the first one whose driver changed, not the last in the list.
+                var old = saved[1].Split(';');
+                var cur = now[1].Split(';');
+                for (var i = 0; i < Math.Min(old.Length, cur.Length); i++)
+                    if (old[i].Trim() != cur[i].Trim()) return (DriverNumber(old[i]), DriverNumber(cur[i]));
+                return (DriverNumber(saved[1]), DriverNumber(now[1]));
+            }
+            catch { return null; }
+        }
+
+        // "NVIDIA GeForce RTX 5070 32.0.16.2124" → "621.24" (NVIDIA's number: the last 5 digits of the last two
+        // parts); other cards → their Windows version.
+        private static string DriverNumber(string drivers)
+        {
+            var match = Regex.Match(drivers, @"(\d+)\.(\d+)\.(\d+)\.(\d+)\s*$");
+            if (!match.Success) return drivers.Trim();
+            if (drivers.IndexOf("NVIDIA", StringComparison.OrdinalIgnoreCase) < 0) return match.Value;
+            var digits = (match.Groups[3].Value + match.Groups[4].Value.PadLeft(4, '0'));
+            if (digits.Length < 5) return match.Value;
+            digits = digits.Substring(digits.Length - 5);
+            return digits.Substring(0, 3) + "." + digits.Substring(3);
+        }
+
         public static void MarkPrecompiled(string root)
         {
             try

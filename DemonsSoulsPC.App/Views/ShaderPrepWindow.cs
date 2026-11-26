@@ -43,8 +43,12 @@ namespace DemonsSoulsPC.App.Views
             try { Icon = new System.Windows.Media.Imaging.BitmapImage(new Uri("pack://application:,,,/Resources/dspc.ico")); } catch { }
 
             var panel = new StackPanel { Margin = new Thickness(32) };
-            panel.Children.Add(Text(Loc.T("Prep.Heading"), "TitleTextStyle", new Thickness(0, 0, 0, 12)));
-            panel.Children.Add(Text(Loc.T("Prep.Intro"), "BodyTextStyle", new Thickness(0, 0, 0, 20)));
+            // After a graphics driver update: why it is back (the driver's compiled shaders are its own: a new one
+            // throws them all away, as in every PC game).
+            var driver = GameSetup.DriverChange(root);
+            panel.Children.Add(Text(driver == null ? Loc.T("Prep.Heading") : Loc.T("Prep.DriverHeading"), "TitleTextStyle", new Thickness(0, 0, 0, 12)));
+            panel.Children.Add(Text(driver == null ? Loc.T("Prep.Intro") : string.Format(Loc.T("Prep.DriverIntro"), driver.Value.Old, driver.Value.New),
+                "BodyTextStyle", new Thickness(0, 0, 0, 20)));
             _bar = new ProgressBar { Height = 14, Minimum = 0, Maximum = 100, IsIndeterminate = true };
             if (TryFindResource("ModernProgressBarStyle") is Style barStyle) _bar.Style = barStyle;
             panel.Children.Add(_bar);

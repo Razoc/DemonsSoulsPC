@@ -11,8 +11,8 @@ namespace DemonsSoulsPC.App.Services
     // What the settings are made from (measured 23/11 on a Ryzen 7 9800X3D + RTX 5070, 1440p): the game is held by the
     // processor near 70 FPS (render thread): with 120 FPS unlocked, native 69, DLSS Quality 66, DLSS Performance 75,
     // FSR 3 66; so lower graphics or an upscaler give almost no frames there, and frame generation is the real gain
-    // (60 -> 120 on screen). DLSS frame generation may switch off at times beside DLSS upscaling (the engine's PS5 Pro
-    // path does not always find the camera), so Smooth keeps the game's own upscaling.
+    // (60 -> 120 on screen), so Smooth keeps the game's own upscaling. (DLSS-G beside DLSS upscaling only stops on loading
+    // screens, checked 26/11: the PS5 Pro path upscales them too, logged as "no camera".)
     public static class GoalPlanner
     {
         public const int Custom = 0, Smooth = 1, Balanced = 2, Quiet = 3;
