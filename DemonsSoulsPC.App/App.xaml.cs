@@ -18,21 +18,6 @@ namespace DemonsSoulsPC.App
         private AppSettings _settings = null!;
         private static string? _root;
 
-        // Demon’s Souls PC ships as one exe: its library DLLs are embedded resources, loaded here when the CLR cannot
-        // find them next to the exe (any version is accepted, which also replaces the binding redirects).
-        static App()
-        {
-            AppDomain.CurrentDomain.AssemblyResolve += (sender, args) =>
-            {
-                var name = new AssemblyName(args.Name).Name + ".dll";
-                using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(name);
-                if (stream == null) return null;
-                var bytes = new byte[stream.Length];
-                stream.Read(bytes, 0, bytes.Length);
-                return Assembly.Load(bytes);
-            };
-        }
-
         // Started by RecompLauncher's Play with --launcher (see OnStartup).
         public static bool FromRecompLauncher { get; private set; }
 

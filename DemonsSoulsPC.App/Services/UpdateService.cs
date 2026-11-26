@@ -7,7 +7,6 @@ using System.Linq;
 using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
 using System.Threading.Tasks;
 using DemonsSoulsPC.App.Models;
 
@@ -163,10 +162,7 @@ namespace DemonsSoulsPC.App.Services
         private async Task<List<GitHubRelease>> FetchReleasesAsync()
         {
             var json = await _httpClient.GetStringAsync(GitHubApiUrl);
-            var releases = JsonSerializer.Deserialize<List<GitHubRelease>>(json, new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true
-            });
+            var releases = Json.Deserialize<List<GitHubRelease>>(json);
             return releases ?? new List<GitHubRelease>();
         }
 

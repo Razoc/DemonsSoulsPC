@@ -3,7 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Reflection;
-using System.Text.Json;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -32,26 +32,26 @@ namespace DemonsSoulsPC.App.Services
             http.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
             using var response = await http.GetAsync(DspcInfo.LatestReleaseApi, cancel);
             if (!response.IsSuccessStatusCode) return null; // no release yet, offline, rate limited
-            using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-            var root = doc.RootElement;
-            var tag = root.GetProperty("tag_name").GetString() ?? "";
+            var root = Json.Object(Json.Parse(await response.Content.ReadAsStringAsync()));
+            var tag = Json.Text(root, "tag_name");
             if (!Version.TryParse(tag.TrimStart('v', 'V'), out var version)) return null;
             if (version.Build < 0) version = new Version(version.Major, version.Minor, 0);
             if (version <= Normalize(DspcInfo.CurrentVersion)) return null;
 
-            foreach (var asset in root.GetProperty("assets").EnumerateArray())
+            var assets = root != null && root.TryGetValue("assets", out var list) && list is object[] items ? items : new object[0];
+            foreach (var asset in assets.Select(Json.Object))
             {
-                if (!string.Equals(asset.GetProperty("name").GetString(), DspcInfo.LauncherAssetName, StringComparison.OrdinalIgnoreCase))
+                if (!string.Equals(Json.Text(asset, "name"), DspcInfo.LauncherAssetName, StringComparison.OrdinalIgnoreCase))
                     continue;
-                string? digest = asset.TryGetProperty("digest", out var d) && d.ValueKind == JsonValueKind.String ? d.GetString() : null;
+                var digest = Json.Text(asset, "digest");
                 return new Release
                 {
                     Version = version,
                     Tag = tag,
-                    Notes = root.TryGetProperty("body", out var b) && b.ValueKind == JsonValueKind.String ? b.GetString() ?? "" : "",
-                    Url = asset.GetProperty("browser_download_url").GetString() ?? "",
-                    Sha256 = digest != null && digest.StartsWith("sha256:") ? digest.Substring(7) : null,
-                    Size = asset.GetProperty("size").GetInt64(),
+                    Notes = Json.Text(root, "body"),
+                    Url = Json.Text(asset, "browser_download_url"),
+                    Sha256 = digest.StartsWith("sha256:") ? digest.Substring(7) : null,
+                    Size = asset != null && asset.TryGetValue("size", out var size) ? Convert.ToInt64(size) : 0,
                 };
             }
             return null;

@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Text.Json;
 using DemonsSoulsPC.App.Models;
 
 namespace DemonsSoulsPC.App.Services
@@ -8,17 +7,11 @@ namespace DemonsSoulsPC.App.Services
     public class SettingsManager
     {
         private readonly string _settingsPath;
-        private readonly JsonSerializerOptions _jsonOptions;
         private AppSettings? _cachedSettings;
 
         public SettingsManager(string rootDirectory)
         {
             _settingsPath = Path.Combine(rootDirectory, "Build", "dspc-settings.json");
-            _jsonOptions = new JsonSerializerOptions
-            {
-                WriteIndented = true,
-                PropertyNameCaseInsensitive = true
-            };
         }
 
         public AppSettings Load()
@@ -31,7 +24,7 @@ namespace DemonsSoulsPC.App.Services
                 try
                 {
                     var json = File.ReadAllText(_settingsPath);
-                    _cachedSettings = JsonSerializer.Deserialize<AppSettings>(json, _jsonOptions) ?? new AppSettings();
+                    _cachedSettings = Json.Deserialize<AppSettings>(json) ?? new AppSettings();
                     // Older files only have the preset index ("rumble"); make the percent explicit.
                     _cachedSettings.NormalizeRumble();
                     // 0.1.x files: frame rate 0..6 -> 30 / 60 / 120, and their "quality (4K)" choice -> standard.
@@ -64,7 +57,7 @@ namespace DemonsSoulsPC.App.Services
                 Directory.CreateDirectory(directory);
             }
 
-            var json = JsonSerializer.Serialize(settings, _jsonOptions);
+            var json = Json.Serialize(settings);
             File.WriteAllText(_settingsPath, json);
         }
 

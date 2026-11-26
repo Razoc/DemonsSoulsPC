@@ -44,7 +44,6 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
-    <PackageReference Include="System.Text.Json" Version="8.0.5" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="PresentationCore" />
@@ -56,6 +55,7 @@
     <Reference Include="System.IO.Compression.FileSystem" />
     <Reference Include="System.Management" />
     <Reference Include="System.Net.Http" />
+    <Reference Include="System.Web.Extensions" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xaml" />
     <Reference Include="WindowsBase" />
@@ -109,6 +109,7 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="Views\ShaderPrepWindow.cs" />
+    <Compile Include="Services\Json.cs" />
     <Compile Include="Services\MemoryCheck.cs" />
     <Compile Include="Services\GoalPlanner.cs" />
     <Compile Include="Services\EngineTitle.cs" />
@@ -194,13 +195,4 @@
     <None Include="App.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <!-- Demon's Souls PC ships as a single exe: every referenced DLL copied next to the exe is also embedded, and
-       App's AssemblyResolve handler loads it from there. -->
-  <Target Name="DspcEmbedReferences" AfterTargets="ResolveAssemblyReferences">
-    <ItemGroup>
-      <EmbeddedResource Include="@(ReferenceCopyLocalPaths)" Condition="'%(ReferenceCopyLocalPaths.Extension)' == '.dll'">
-        <LogicalName>%(ReferenceCopyLocalPaths.Filename)%(ReferenceCopyLocalPaths.Extension)</LogicalName>
-      </EmbeddedResource>
-    </ItemGroup>
-  </Target>
 </Project>

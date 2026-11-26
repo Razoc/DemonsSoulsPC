@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
-using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
@@ -51,7 +50,7 @@ namespace DemonsSoulsPC.App.Services
             try
             {
                 var path = Path.Combine(engineDir, FileName);
-                return File.Exists(path) ? JsonSerializer.Deserialize<GameFeatures>(File.ReadAllText(path)) : null;
+                return File.Exists(path) ? Json.Deserialize<GameFeatures>(File.ReadAllText(path)) : null;
             }
             catch
             {
@@ -143,7 +142,7 @@ namespace DemonsSoulsPC.App.Services
             RemoveOldBuild(Log);
 
             File.WriteAllText(Path.Combine(_engine, GameFeatures.FileName),
-                JsonSerializer.Serialize(features, new JsonSerializerOptions { WriteIndented = true }));
+                Json.Serialize(features));
             InstallationManager.SaveManifest(_root,
                 InstallationManager.CreateManifest(_root, dump, version, titleId, features.SetupAt));
             Report(100, Loc.T("Done."));
@@ -391,16 +390,14 @@ namespace DemonsSoulsPC.App.Services
             {
                 var path = Path.Combine(dump, "sce_sys", "param.json");
                 if (!File.Exists(path)) return false;
-                using var document = JsonDocument.Parse(File.ReadAllText(path));
-                var root = document.RootElement;
-                if (root.TryGetProperty("conceptId", out var concept) &&
-                    (concept.ValueKind == JsonValueKind.Number ? concept.GetRawText() : concept.ValueKind == JsonValueKind.String ? concept.GetString() : "") == DemonsSoulsConceptId)
+                var root = Json.Object(Json.Parse(File.ReadAllText(path)));
+                if (root == null) return false;
+                if (root.TryGetValue("conceptId", out var concept) && concept is string or int or long &&
+                    Convert.ToString(concept, System.Globalization.CultureInfo.InvariantCulture) == DemonsSoulsConceptId)
                     return true;
-                if (root.TryGetProperty("localizedParameters", out var localized) && localized.ValueKind == JsonValueKind.Object)
-                    foreach (var language in localized.EnumerateObject())
-                        if (language.Value.ValueKind == JsonValueKind.Object && language.Value.TryGetProperty("titleName", out var name) &&
-                            name.ValueKind == JsonValueKind.String &&
-                            new string((name.GetString() ?? "").Where(char.IsLetter).ToArray()).ToUpperInvariant().Contains("DEMONSSOULS"))
+                if (Json.Object(root.TryGetValue("localizedParameters", out var localized) ? localized : null) is { } languages)
+                    foreach (var language in languages.Values)
+                        if (new string(Json.Text(Json.Object(language), "titleName").Where(char.IsLetter).ToArray()).ToUpperInvariant().Contains("DEMONSSOULS"))
                             return true;
             }
             catch { }
@@ -411,9 +408,8 @@ namespace DemonsSoulsPC.App.Services
         {
             var path = Path.Combine(dump, "sce_sys", "param.json");
             if (!File.Exists(path)) return ("", "");
-            using var document = JsonDocument.Parse(File.ReadAllText(path));
-            string Get(string name) => document.RootElement.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() ?? "" : "";
-            return (Get("titleId"), Get("contentVersion"));
+            var root = Json.Object(Json.Parse(File.ReadAllText(path)));
+            return (Json.Text(root, "titleId"), Json.Text(root, "contentVersion"));
         }
 
         // Deletes a folder this setup made. Junctions are removed as links, never followed into the dump.

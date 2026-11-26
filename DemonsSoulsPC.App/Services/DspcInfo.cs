@@ -1,7 +1,6 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Reflection;
-using System.Text.Json;
 
 namespace DemonsSoulsPC.App.Services
 {
@@ -69,7 +68,7 @@ namespace DemonsSoulsPC.App.Services
             try
             {
                 if (File.Exists(UserDataFile))
-                    return JsonSerializer.Deserialize<UserData>(File.ReadAllText(UserDataFile)) ?? new UserData();
+                    return Json.Deserialize<UserData>(File.ReadAllText(UserDataFile)) ?? new UserData();
             }
             catch { }
             return new UserData();
@@ -79,7 +78,7 @@ namespace DemonsSoulsPC.App.Services
         {
             Directory.CreateDirectory(UserDataDirectory);
             var tmp = UserDataFile + ".tmp";
-            File.WriteAllText(tmp, JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true }));
+            File.WriteAllText(tmp, Json.Serialize(data));
             if (File.Exists(UserDataFile)) File.Delete(UserDataFile);
             File.Move(tmp, UserDataFile);
         }

@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Diagnostics;
 using System.IO;
-using System.Text.Json;
 
 namespace DemonsSoulsPC.App.Services
 {
@@ -100,9 +99,11 @@ namespace DemonsSoulsPC.App.Services
             try
             {
                 if (!File.Exists(file)) return values;
-                using var doc = JsonDocument.Parse(File.ReadAllText(file));
-                foreach (var p in doc.RootElement.EnumerateObject())
-                    values[p.Name] = p.Value.ValueKind == JsonValueKind.String ? p.Value.GetString() ?? "" : p.Value.ToString();
+                var root = Json.Object(Json.Parse(File.ReadAllText(file)));
+                if (root != null)
+                    foreach (var p in root)
+                        values[p.Key] = p.Value is bool flag ? (flag ? "true" : "false")
+                            : Convert.ToString(p.Value, System.Globalization.CultureInfo.InvariantCulture) ?? "";
             }
             catch { }
             return values;
