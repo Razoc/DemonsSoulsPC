@@ -21,6 +21,13 @@ namespace DemonsSoulsPC.App
         // Started by RecompLauncher's Play with --launcher (see OnStartup).
         public static bool FromRecompLauncher { get; private set; }
 
+        // A shader precompile never outlives the launcher that started it (an update's restart, a closed window...).
+        protected override void OnExit(ExitEventArgs e)
+        {
+            GameSetup.StopRunningPrecompile();
+            base.OnExit(e);
+        }
+
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);

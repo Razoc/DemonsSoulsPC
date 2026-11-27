@@ -314,6 +314,41 @@ namespace DemonsSoulsPC.App.Services
         // PrecompileAsync's code when another launcher is preparing the same install.
         public const int AlreadyRunning = 91;
 
+        // The precompile script this launcher runs, stopped when the launcher ends however it ends (App.OnExit).
+        private static Process? _running;
+
+        public static void StopRunningPrecompile()
+        {
+            var process = _running;
+            try { if (process != null && !process.HasExited) KillTree(process); } catch { }
+        }
+
+        // A precompile left running by a launcher that ended without stopping it (0.2.5: a self-update's restart). It
+        // still held the pipeline store, and the next run's merge could not replace it ("Accès refusé", a player's report
+        // of 27/11). Holding the install's lock, this launcher knows any precompile of this engine is such an orphan.
+        private static int StopOrphanPrecompile(string engine)
+        {
+            var script = Path.Combine(engine, PrecompileScript);
+            var copies = Path.Combine(engine, "_PipelineCache", "precompile-as-emulator") + Path.DirectorySeparatorChar;
+            int stopped = 0;
+            try
+            {
+                using var searcher = new System.Management.ManagementObjectSearcher(
+                    "SELECT ProcessId, ExecutablePath, CommandLine FROM Win32_Process WHERE Name = 'powershell.exe' OR Name = 'kyty_emulator.exe'");
+                foreach (var found in searcher.Get())
+                {
+                    var command = $"{found["CommandLine"]}";
+                    var exe = $"{found["ExecutablePath"]}";
+                    if (command.IndexOf(script, StringComparison.OrdinalIgnoreCase) < 0 && !exe.StartsWith(copies, StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    try { using var orphan = Process.GetProcessById(Convert.ToInt32(found["ProcessId"])); KillTree(orphan); stopped++; }
+                    catch { } // already gone
+                }
+            }
+            catch { }
+            return stopped;
+        }
+
         private static async Task<int> PrecompileHeldAsync(string root, string dump, string logs, IProgress<(int Percent, string Message)>? progress,
             System.Threading.CancellationToken cancel)
         {
@@ -322,7 +357,9 @@ namespace DemonsSoulsPC.App.Services
             // pipelines play met, compiled in play with freezes of up to 18 s in players' reports.)
             var arguments = new List<string> { "-Game", dump };
             var psi = PowerShell(Path.Combine(engine, PrecompileScript), arguments, engine);
+            var orphans = StopOrphanPrecompile(engine);
             using var log = new StreamWriter(Path.Combine(logs, "precompile.log"), false, new UTF8Encoding(false)) { AutoFlush = true };
+            if (orphans > 0) log.WriteLine($"launcher: stopped {orphans} precompile process(es) left running by an earlier launcher");
             using var process = new Process { StartInfo = psi };
             var shards = new Regex(@"shards:\s*(\d+)\s+of\s+(\d+)\s+done\s*\((\d+)%\)");
             void Line(string? text)
@@ -342,10 +379,12 @@ namespace DemonsSoulsPC.App.Services
             process.OutputDataReceived += (s, e) => Line(e.Data);
             process.ErrorDataReceived += (s, e) => Line(e.Data);
             process.Start();
+            _running = process;
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
             using (cancel.Register(() => KillTree(process)))
                 await Task.Run(() => process.WaitForExit());
+            _running = null;
             lock (log) log.Dispose(); // the translation step appends to the same file
             if (process.ExitCode != 0 || cancel.IsCancellationRequested) return process.ExitCode;
 
